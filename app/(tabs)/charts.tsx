@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { generateCandlestickData, assetPairs, timeframes, Timeframe } from '@/constants/mockData';
