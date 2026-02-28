@@ -39,7 +39,7 @@ export default function SignalsScreen() {
 
   const { generateText } = useTextGeneration();
 
-  // Generate AI insights for signals that don't have them
+  // Generate Voltrix AI insights for signals that don't have them
   const generateAIInsights = useCallback(async () => {
     setLoadingInsights(true);
     try {
@@ -48,7 +48,7 @@ export default function SignalsScreen() {
 
       for (const signal of signalsNeedingInsights) {
         try {
-          const prompt = `You are a professional forex trading analyst. Given this trade signal for ${signal.symbol} (${signal.type} at ${signal.entry}, SL: ${signal.sl}, TP: ${signal.tp}), with the technical reason being "${signal.technicalReason}", provide a concise 1-2 sentence AI insight explaining the technical logic and market context. Be specific about indicators and price action. Keep it under 150 characters.`;
+          const prompt = `You are Voltrix AI, a professional forex trading analyst for the Voltrix trading platform. Given this trade signal for ${signal.symbol} (${signal.type} at ${signal.entry}, SL: ${signal.sl}, TP: ${signal.tp}), with the technical reason being "${signal.technicalReason}", provide a concise 1-2 sentence AI insight explaining the technical logic and market context. Be specific about indicators and price action. Keep it under 150 characters.`;
 
           const result = await generateText(prompt);
 
@@ -71,7 +71,7 @@ export default function SignalsScreen() {
     }
   }, [signals, generateText]);
 
-  // Load AI insights on mount
+  // Load Voltrix AI insights on mount
   useEffect(() => {
     generateAIInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,19 +109,27 @@ export default function SignalsScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.neonGreen} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.voltrixAccent}
+          />
         }
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View>
+            <View style={styles.brandRow}>
+              <View style={styles.voltrixDot} />
+              <Text style={styles.brandTag}>VOLTRIX</Text>
+            </View>
             <Text style={styles.title}>Signals</Text>
-            <Text style={styles.subtitle}>AI-Powered Trade Insights</Text>
+            <Text style={styles.subtitle}>Voltrix AI Trade Insights</Text>
           </View>
           {loadingInsights && (
             <View style={styles.aiLoadingBadge}>
-              <ActivityIndicator size="small" color={Colors.blue} />
-              <Text style={styles.aiLoadingText}>AI analyzing...</Text>
+              <ActivityIndicator size="small" color={Colors.voltrixAccent} />
+              <Text style={styles.aiLoadingText}>Voltrix AI...</Text>
             </View>
           )}
         </Animated.View>
@@ -137,7 +145,7 @@ export default function SignalsScreen() {
             <Text style={styles.statLabel}>Active</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: Colors.neonGreen, fontFamily: Fonts.mono }]}>
+            <Text style={[styles.statValue, { color: Colors.voltrixAccent, fontFamily: Fonts.mono }]}>
               {winRate.toFixed(0)}%
             </Text>
             <Text style={styles.statLabel}>Win Rate</Text>
@@ -204,13 +212,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  voltrixDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.voltrixAccent,
+    shadowColor: Colors.voltrixAccent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
+  brandTag: {
+    color: Colors.voltrixAccent,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   subtitle: {
     color: Colors.textTertiary,
@@ -221,13 +251,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.blueDim,
+    backgroundColor: Colors.voltrixAccentDim,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.voltrixAccentGlow,
+    marginTop: 8,
   },
   aiLoadingText: {
-    color: Colors.blue,
+    color: Colors.voltrixAccent,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -268,8 +301,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderDark,
   },
   filterChipActive: {
-    backgroundColor: Colors.neonGreenDim,
-    borderColor: Colors.neonGreen,
+    backgroundColor: Colors.voltrixAccentDim,
+    borderColor: Colors.voltrixAccent,
   },
   filterText: {
     color: Colors.textSecondary,
@@ -277,7 +310,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   filterTextActive: {
-    color: Colors.neonGreen,
+    color: Colors.voltrixAccent,
   },
   emptyState: {
     alignItems: 'center',

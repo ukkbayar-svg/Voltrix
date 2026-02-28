@@ -41,9 +41,9 @@ const slides: OnboardingSlide[] = [
   {
     id: '1',
     icon: 'pulse',
-    iconColor: Colors.neonGreen,
-    title: 'Health Command\nCenter',
-    subtitle: 'Your trading portfolio at a glance with real-time monitoring.',
+    iconColor: Colors.voltrixAccent,
+    title: 'Voltrix\nCommand',
+    subtitle: 'Your trading portfolio at a glance with real-time live monitoring.',
     features: [
       { icon: 'wallet', text: 'Live Balance & Equity tracking' },
       { icon: 'trending-up', text: 'Floating P/L with pulse animations' },
@@ -54,7 +54,7 @@ const slides: OnboardingSlide[] = [
     id: '2',
     icon: 'shield-checkmark',
     iconColor: Colors.orange,
-    title: 'Risk Guard\nSystem',
+    title: 'Voltrix\nRisk Guard',
     subtitle: 'Advanced risk management with visual drawdown tracking.',
     features: [
       { icon: 'speedometer', text: 'Dynamic drawdown gauge' },
@@ -66,11 +66,11 @@ const slides: OnboardingSlide[] = [
     id: '3',
     icon: 'sparkles',
     iconColor: Colors.blue,
-    title: 'AI-Powered\nSignals',
-    subtitle: 'Smart trade signals with AI-generated technical insights.',
+    title: 'Voltrix AI\nSignals',
+    subtitle: 'Smart trade signals powered by Voltrix AI technical analysis.',
     features: [
-      { icon: 'analytics', text: 'Professional signal feed' },
-      { icon: 'bulb', text: 'AI technical analysis insights' },
+      { icon: 'analytics', text: 'Professional Voltrix signal feed' },
+      { icon: 'bulb', text: 'Voltrix AI technical insights' },
       { icon: 'grid', text: 'Advanced candlestick charts' },
     ],
   },

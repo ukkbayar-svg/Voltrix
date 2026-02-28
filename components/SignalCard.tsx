@@ -104,8 +104,8 @@ export default function SignalCard({ signal, onPress }: SignalCardProps) {
       {signal.aiInsight && (
         <View style={styles.aiRow}>
           <View style={styles.aiBadge}>
-            <Ionicons name="sparkles" size={10} color={Colors.blue} />
-            <Text style={styles.aiBadgeText}>AI</Text>
+            <Ionicons name="sparkles" size={10} color={Colors.voltrixAccent} />
+            <Text style={styles.aiBadgeText}>VOLTRIX AI</Text>
           </View>
           <Text style={styles.aiText} numberOfLines={2}>
             {signal.aiInsight}
@@ -210,23 +210,26 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 6,
     marginTop: Spacing.sm,
-    backgroundColor: Colors.blueDim,
+    backgroundColor: Colors.voltrixAccentDim,
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.voltrixAccentGlow,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    backgroundColor: 'rgba(168, 85, 247, 0.22)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
   aiBadgeText: {
-    color: Colors.blue,
-    fontSize: 9,
-    fontWeight: '700',
+    color: Colors.voltrixAccent,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   aiText: {
     color: Colors.textSecondary,

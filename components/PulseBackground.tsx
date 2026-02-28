@@ -32,8 +32,8 @@ export default function PulseBackground({ children, isPositive, style, intensity
 
   const animatedStyle = useAnimatedStyle(() => ({
     backgroundColor: isPositive
-      ? `rgba(0, 255, 65, ${opacity.value})`
-      : `rgba(255, 59, 59, ${opacity.value})`,
+      ? `rgba(0, 230, 118, ${opacity.value})`
+      : `rgba(255, 59, 92, ${opacity.value})`,
   }));
 
   return (

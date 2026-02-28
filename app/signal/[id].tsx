@@ -55,7 +55,7 @@ export default function SignalDetailScreen() {
     const fetchAI = async () => {
       setLoadingAI(true);
       try {
-        const prompt = `You are a senior forex trading analyst. Analyze this trade signal in detail:
+        const prompt = `You are Voltrix AI, a senior forex trading analyst for the Voltrix platform. Analyze this trade signal in detail:
 - Pair: ${signal.symbol}
 - Direction: ${signal.type}
 - Entry: ${signal.entry}
@@ -237,10 +237,10 @@ Keep it concise and actionable.`;
           <View style={styles.aiCard}>
             <View style={styles.aiHeader}>
               <View style={styles.aiBadge}>
-                <Ionicons name="sparkles" size={14} color={Colors.blue} />
-                <Text style={styles.aiBadgeText}>AI Analysis</Text>
+                <Ionicons name="sparkles" size={14} color={Colors.voltrixAccent} />
+                <Text style={styles.aiBadgeText}>Voltrix AI</Text>
               </View>
-              {loadingAI && <ActivityIndicator size="small" color={Colors.blue} />}
+              {loadingAI && <ActivityIndicator size="small" color={Colors.voltrixAccent} />}
             </View>
             {loadingAI ? (
               <View style={styles.aiLoading}>
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.blue,
+    borderColor: Colors.voltrixAccent,
     borderLeftWidth: 3,
   },
   aiHeader: {
@@ -498,13 +498,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.blueDim,
+    backgroundColor: Colors.voltrixAccentDim,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.voltrixAccentGlow,
   },
   aiBadgeText: {
-    color: Colors.blue,
+    color: Colors.voltrixAccent,
     fontSize: 12,
     fontWeight: '700',
   },

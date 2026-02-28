@@ -135,8 +135,12 @@ export default function RiskScreen() {
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View>
+            <View style={styles.brandRow}>
+              <View style={styles.voltrixDot} />
+              <Text style={styles.brandTag}>VOLTRIX</Text>
+            </View>
             <Text style={styles.title}>Risk Guard</Text>
-            <Text style={styles.subtitle}>Drawdown & Risk Monitor</Text>
+            <Text style={styles.subtitle}>Voltrix Risk Monitor</Text>
           </View>
           <Animated.View style={flashStyle}>
             <View style={[styles.riskBadge, { backgroundColor: `${dailyRisk.color}15`, borderColor: `${dailyRisk.color}30` }]}>
@@ -295,13 +299,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  voltrixDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.voltrixAccent,
+    shadowColor: Colors.voltrixAccent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
+  brandTag: {
+    color: Colors.voltrixAccent,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   subtitle: {
     color: Colors.textTertiary,

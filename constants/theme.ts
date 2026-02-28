@@ -1,45 +1,53 @@
 import { Platform } from 'react-native';
 
 export const Colors = {
-  // Core backgrounds
-  deepCharcoal: '#0B0E11',
+  // Core backgrounds — ultra-dark Voltrix premium palette
+  deepCharcoal: '#0A0B0F',
   pureBlack: '#000000',
-  cardBg: '#111419',
-  cardBgLight: '#181C23',
-  surfaceBg: '#1A1E26',
-  borderDark: '#1E2330',
-  borderLight: '#2A2F3C',
+  cardBg: '#0F1117',
+  cardBgLight: '#151820',
+  surfaceBg: '#181C26',
+  borderDark: '#1C2035',
+  borderLight: '#252A3C',
 
-  // Accents
-  neonGreen: '#00FF41',
-  neonGreenDim: 'rgba(0, 255, 65, 0.15)',
-  neonGreenGlow: 'rgba(0, 255, 65, 0.3)',
-  crimsonRed: '#FF3B3B',
-  crimsonRedDim: 'rgba(255, 59, 59, 0.15)',
-  crimsonRedGlow: 'rgba(255, 59, 59, 0.3)',
+  // Voltrix Brand Accent — Electric Violet
+  voltrixAccent: '#A855F7',
+  voltrixAccentDim: 'rgba(168, 85, 247, 0.14)',
+  voltrixAccentGlow: 'rgba(168, 85, 247, 0.32)',
+  voltrixAccentBright: '#C084FC',
+
+  // Trading: Positive/Buy
+  neonGreen: '#00E676',
+  neonGreenDim: 'rgba(0, 230, 118, 0.13)',
+  neonGreenGlow: 'rgba(0, 230, 118, 0.28)',
+
+  // Trading: Negative/Sell
+  crimsonRed: '#FF3B5C',
+  crimsonRedDim: 'rgba(255, 59, 92, 0.14)',
+  crimsonRedGlow: 'rgba(255, 59, 92, 0.28)',
 
   // Warnings
-  orange: '#FF9500',
-  orangeDim: 'rgba(255, 149, 0, 0.15)',
+  orange: '#FF9F0A',
+  orangeDim: 'rgba(255, 159, 10, 0.14)',
   yellow: '#FFD60A',
 
   // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#8A919E',
-  textTertiary: '#5A6170',
+  textPrimary: '#F0F2FF',
+  textSecondary: '#8A91A8',
+  textTertiary: '#525870',
 
   // Glassmorphism
-  glassWhite: 'rgba(255, 255, 255, 0.06)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
-  glassOverlay: 'rgba(11, 14, 17, 0.85)',
+  glassWhite: 'rgba(255, 255, 255, 0.05)',
+  glassBorder: 'rgba(168, 85, 247, 0.12)',
+  glassOverlay: 'rgba(10, 11, 15, 0.88)',
 
   // Chart
-  chartGrid: 'rgba(255, 255, 255, 0.04)',
-  chartLine: '#00FF41',
+  chartGrid: 'rgba(255, 255, 255, 0.03)',
+  chartLine: '#00E676',
 
-  // Blue accent
-  blue: '#007AFF',
-  blueDim: 'rgba(0, 122, 255, 0.15)',
+  // AI / Info accent — Electric Indigo
+  blue: '#818CF8',
+  blueDim: 'rgba(129, 140, 248, 0.13)',
 };
 
 export const Fonts = {

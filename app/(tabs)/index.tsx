@@ -124,14 +124,18 @@ export default function HealthScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.neonGreen}
+            tintColor={Colors.voltrixAccent}
           />
         }
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Health Center</Text>
+            <View style={styles.brandRow}>
+              <View style={styles.voltrixDot} />
+              <Text style={styles.brandTag}>VOLTRIX</Text>
+            </View>
+            <Text style={styles.greeting}>Command</Text>
             <Text style={styles.headerSubtitle}>Live Portfolio Monitor</Text>
           </View>
           <Pressable
@@ -210,7 +214,7 @@ export default function HealthScreen() {
             <StatChip
               label="Free Margin"
               value={formatCurrency(account.freeMargin)}
-              color={Colors.neonGreen}
+              color={Colors.voltrixAccent}
               icon={<Ionicons name="wallet-outline" size={12} color={Colors.textTertiary} />}
             />
           </View>
@@ -257,13 +261,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  voltrixDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.voltrixAccent,
+    shadowColor: Colors.voltrixAccent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
+  brandTag: {
+    color: Colors.voltrixAccent,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
   },
   greeting: {
     color: Colors.textPrimary,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   headerSubtitle: {
     color: Colors.textTertiary,
@@ -279,6 +305,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.borderDark,
+    marginTop: 4,
   },
   notifDot: {
     position: 'absolute',
@@ -287,7 +314,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.neonGreen,
+    backgroundColor: Colors.voltrixAccent,
+    shadowColor: Colors.voltrixAccent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
   },
   balanceCard: {
     marginTop: 4,

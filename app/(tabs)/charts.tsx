@@ -62,8 +62,12 @@ export default function ChartsScreen() {
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View>
+            <View style={styles.brandRow}>
+              <View style={styles.voltrixDot} />
+              <Text style={styles.brandTag}>VOLTRIX</Text>
+            </View>
             <Text style={styles.title}>Charts</Text>
-            <Text style={styles.subtitle}>Advanced Technical Analysis</Text>
+            <Text style={styles.subtitle}>Voltrix Technical Analysis</Text>
           </View>
           <View style={styles.chartToggle}>
             <Pressable
@@ -73,7 +77,7 @@ export default function ChartsScreen() {
                 setChartType('candlestick');
               }}
             >
-              <Ionicons name="bar-chart" size={16} color={chartType === 'candlestick' ? Colors.neonGreen : Colors.textTertiary} />
+              <Ionicons name="bar-chart" size={16} color={chartType === 'candlestick' ? Colors.voltrixAccent : Colors.textTertiary} />
             </Pressable>
             <Pressable
               style={[styles.toggleBtn, chartType === 'line' && styles.toggleBtnActive]}
@@ -82,7 +86,7 @@ export default function ChartsScreen() {
                 setChartType('line');
               }}
             >
-              <Ionicons name="analytics" size={16} color={chartType === 'line' ? Colors.neonGreen : Colors.textTertiary} />
+              <Ionicons name="analytics" size={16} color={chartType === 'line' ? Colors.voltrixAccent : Colors.textTertiary} />
             </Pressable>
           </View>
         </Animated.View>
@@ -232,13 +236,35 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  voltrixDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.voltrixAccent,
+    shadowColor: Colors.voltrixAccent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
+  brandTag: {
+    color: Colors.voltrixAccent,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   subtitle: {
     color: Colors.textTertiary,
@@ -258,7 +284,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   toggleBtnActive: {
-    backgroundColor: Colors.neonGreenDim,
+    backgroundColor: Colors.voltrixAccentDim,
   },
   pairRow: {
     gap: 8,
@@ -273,8 +299,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderDark,
   },
   pairChipActive: {
-    backgroundColor: Colors.neonGreenDim,
-    borderColor: Colors.neonGreen,
+    backgroundColor: Colors.voltrixAccentDim,
+    borderColor: Colors.voltrixAccent,
   },
   pairText: {
     color: Colors.textSecondary,
@@ -282,7 +308,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pairTextActive: {
-    color: Colors.neonGreen,
+    color: Colors.voltrixAccent,
   },
   priceInfo: {
     gap: 12,
@@ -345,7 +371,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tfBtnActive: {
-    backgroundColor: Colors.neonGreenDim,
+    backgroundColor: Colors.voltrixAccentDim,
   },
   tfText: {
     color: Colors.textTertiary,
@@ -354,7 +380,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   tfTextActive: {
-    color: Colors.neonGreen,
+    color: Colors.voltrixAccent,
   },
   tfSpacer: {
     flex: 1,

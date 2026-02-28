@@ -25,14 +25,14 @@ export default function TabLayout() {
         tabBarBackground: () =>
           Platform.OS !== 'web' ? (
             <BlurView
-              intensity={40}
+              intensity={50}
               tint="dark"
               style={StyleSheet.absoluteFill}
             >
               <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.glassOverlay }]} />
             </BlurView>
           ) : null,
-        tabBarActiveTintColor: Colors.neonGreen,
+        tabBarActiveTintColor: Colors.voltrixAccent,
         tabBarInactiveTintColor: Colors.textTertiary,
         tabBarLabelStyle: {
           fontSize: 10,
@@ -48,7 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Health',
+          title: 'Command',
           tabBarIcon: ({ focused, color }) => (
             <View style={focused ? styles.activeIconBg : undefined}>
               <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={22} color={color} />
@@ -95,7 +95,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   activeIconBg: {
-    backgroundColor: Colors.neonGreenDim,
+    backgroundColor: Colors.voltrixAccentDim,
     borderRadius: 10,
     padding: 4,
   },
