@@ -3,6 +3,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { AuthProvider } from '@fastshot/auth';
+import { supabase } from '@/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,7 +24,15 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <AuthProvider
+      supabaseClient={supabase}
+      routes={{
+        login: '/(auth)/login',
+        afterLogin: '/(tabs)',
+        protected: ['tabs', 'app'],
+        guest: ['auth'],
+      }}
+    >
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -32,6 +42,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
         <Stack.Screen
@@ -41,7 +52,8 @@ export default function RootLayout() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen name="auth/callback" />
       </Stack>
-    </>
+    </AuthProvider>
   );
 }

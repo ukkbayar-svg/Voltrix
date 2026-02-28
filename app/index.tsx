@@ -25,11 +25,13 @@ export default function IndexScreen() {
   if (isLoading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={Colors.neonGreen} />
+        <ActivityIndicator size="large" color={Colors.voltrixAccent} />
       </View>
     );
   }
 
+  // AuthProvider handles auth redirect automatically
+  // Just navigate to tabs or onboarding based on onboarding status
   if (hasOnboarded) {
     return <Redirect href="/(tabs)" />;
   }

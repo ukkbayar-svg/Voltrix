@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +22,17 @@ import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { mockAccount, AccountData } from '@/constants/mockData';
 import GlassContainer from '@/components/GlassContainer';
 import CircularGauge from '@/components/CircularGauge';
+import { supabase, DbAccountData, DbRiskAlert } from '@/lib/supabase';
+import { useAuth } from '@fastshot/auth';
+
+interface RiskAlertItem {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  color: string;
+  timestamp: string;
+}
 
 function getRiskLevel(percentage: number): { level: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (percentage < 0.4) return { level: 'LOW', color: Colors.neonGreen, icon: 'shield-checkmark' };
@@ -45,7 +57,7 @@ function ProgressBar({ value, maxValue, label, color }: {
         </Text>
       </View>
       <View style={styles.progressTrack}>
-        <Animated.View
+        <View
           style={[
             styles.progressFill,
             {
@@ -63,7 +75,7 @@ function ProgressBar({ value, maxValue, label, color }: {
   );
 }
 
-function RiskAlert({ icon, title, description, color, timestamp }: {
+function RiskAlertCard({ icon, title, description, color, timestamp }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
@@ -84,10 +96,63 @@ function RiskAlert({ icon, title, description, color, timestamp }: {
   );
 }
 
+function timeAgo(dateString: string): string {
+  const diff = Date.now() - new Date(dateString).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function dbToRiskAlert(db: DbRiskAlert): RiskAlertItem {
+  return {
+    id: db.id,
+    icon: db.icon as keyof typeof Ionicons.glyphMap,
+    title: db.title,
+    description: db.description,
+    color: db.color,
+    timestamp: timeAgo(db.created_at),
+  };
+}
+
+const DEFAULT_ALERTS: RiskAlertItem[] = [
+  {
+    id: '1',
+    icon: 'warning',
+    title: 'Approaching Daily Limit',
+    description: 'Drawdown at 46% of daily maximum. Consider reducing exposure.',
+    color: Colors.orange,
+    timestamp: '12 min ago',
+  },
+  {
+    id: '2',
+    icon: 'trending-down',
+    title: 'Drawdown Spike Detected',
+    description: 'USD/JPY position contributing -$306 to floating loss.',
+    color: Colors.crimsonRed,
+    timestamp: '24 min ago',
+  },
+  {
+    id: '3',
+    icon: 'shield-checkmark',
+    title: 'Risk Parameters Updated',
+    description: 'Daily drawdown limit set to 5.0%. Account drawdown limit set to 10.0%.',
+    color: Colors.neonGreen,
+    timestamp: '2h ago',
+  },
+];
+
 export default function RiskScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [account, setAccount] = useState<AccountData>(mockAccount);
+  const [riskAlerts, setRiskAlerts] = useState<RiskAlertItem[]>(DEFAULT_ALERTS);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const flashOpacity = useSharedValue(1);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const accountIdRef = useRef<string | null>(null);
 
   const dailyRisk = getRiskLevel(account.dailyDrawdown / account.maxDailyDrawdown);
   const accountRisk = getRiskLevel(account.currentAccountDrawdown / account.maxAccountDrawdown);
@@ -104,7 +169,7 @@ export default function RiskScreen() {
         false
       );
     } else {
-      flashOpacity.value = 1;
+      flashOpacity.value = withTiming(1, { duration: 300 });
     }
   }, [isHighRisk, flashOpacity]);
 
@@ -112,17 +177,224 @@ export default function RiskScreen() {
     opacity: isHighRisk ? flashOpacity.value : 1,
   }));
 
-  // Simulate drawdown changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAccount((prev) => {
-        const ddChange = (Math.random() - 0.45) * 0.1;
-        const newDD = Math.max(0, Math.min(prev.maxDailyDrawdown, prev.dailyDrawdown + ddChange));
-        return { ...prev, dailyDrawdown: Number(newDD.toFixed(2)) };
-      });
-    }, 3000);
-    return () => clearInterval(interval);
+  // Fetch live account data including risk metrics
+  const fetchAccountData = useCallback(async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('account_data')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (data) {
+        accountIdRef.current = data.id;
+        const dbData = data as DbAccountData;
+        setAccount({
+          balance: Number(dbData.balance),
+          equity: Number(dbData.equity),
+          floatingPL: Number(dbData.floating_pl),
+          marginLevel: Number(dbData.margin_level),
+          usedMargin: Number(dbData.used_margin),
+          freeMargin: Number(dbData.free_margin),
+          dailyDrawdown: Number(dbData.daily_drawdown),
+          maxDailyDrawdown: Number(dbData.max_daily_drawdown),
+          maxAccountDrawdown: Number(dbData.max_account_drawdown),
+          currentAccountDrawdown: Number(dbData.current_account_drawdown),
+        });
+        setIsLive(true);
+        return true;
+      }
+    } catch {
+      // Use mock data fallback
+    }
+    return false;
   }, []);
+
+  // Fetch risk alerts
+  const fetchRiskAlerts = useCallback(async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('risk_alerts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (data && data.length > 0) {
+        setRiskAlerts(data.map(dbToRiskAlert));
+        return true;
+      }
+    } catch {
+      // Use default alerts
+    }
+    return false;
+  }, []);
+
+  // Seed initial risk alerts for new users
+  const seedRiskAlerts = useCallback(async (userId: string) => {
+    try {
+      const alertsToInsert = [
+        {
+          user_id: userId,
+          icon: 'warning',
+          title: 'Approaching Daily Limit',
+          description: 'Drawdown at 46% of daily maximum. Consider reducing exposure.',
+          color: Colors.orange,
+        },
+        {
+          user_id: userId,
+          icon: 'trending-down',
+          title: 'Drawdown Spike Detected',
+          description: 'USD/JPY position contributing -$306 to floating loss.',
+          color: Colors.crimsonRed,
+        },
+        {
+          user_id: userId,
+          icon: 'shield-checkmark',
+          title: 'Risk Parameters Updated',
+          description: 'Daily drawdown limit set to 5.0%. Account drawdown limit set to 10.0%.',
+          color: Colors.neonGreen,
+        },
+      ];
+      await supabase.from('risk_alerts').insert(alertsToInsert);
+    } catch {
+      // Table may not exist
+    }
+  }, []);
+
+  // Subscribe to real-time account_data changes
+  const subscribeToAccountData = useCallback((userId: string) => {
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+    }
+
+    const channel = supabase
+      .channel(`risk-account-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'account_data',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const dbData = payload.new as DbAccountData;
+          setAccount({
+            balance: Number(dbData.balance),
+            equity: Number(dbData.equity),
+            floatingPL: Number(dbData.floating_pl),
+            marginLevel: Number(dbData.margin_level),
+            usedMargin: Number(dbData.used_margin),
+            freeMargin: Number(dbData.free_margin),
+            dailyDrawdown: Number(dbData.daily_drawdown),
+            maxDailyDrawdown: Number(dbData.max_daily_drawdown),
+            maxAccountDrawdown: Number(dbData.max_account_drawdown),
+            currentAccountDrawdown: Number(dbData.current_account_drawdown),
+          });
+          setIsLive(true);
+
+          // Auto-add risk alert if approaching limit
+          const newDailyDD = Number(dbData.daily_drawdown);
+          const maxDailyDD = Number(dbData.max_daily_drawdown);
+          if (newDailyDD / maxDailyDD > 0.7) {
+            const newAlert: RiskAlertItem = {
+              id: Date.now().toString(),
+              icon: 'alert-circle',
+              title: 'High Risk Detected',
+              description: `Daily drawdown at ${((newDailyDD / maxDailyDD) * 100).toFixed(0)}% of limit. Take action immediately.`,
+              color: Colors.crimsonRed,
+              timestamp: 'just now',
+            };
+            setRiskAlerts((prev) => [newAlert, ...prev.slice(0, 4)]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'risk_alerts',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newAlert = dbToRiskAlert(payload.new as DbRiskAlert);
+          setRiskAlerts((prev) => [newAlert, ...prev.slice(0, 4)]);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setIsLive(true);
+      });
+
+    channelRef.current = channel;
+  }, []);
+
+  // Simulate daily drawdown updates to Supabase
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      if (isLive && accountIdRef.current) {
+        const ddChange = (Math.random() - 0.45) * 0.1;
+        const newDD = Math.max(0, Math.min(account.maxDailyDrawdown, account.dailyDrawdown + ddChange));
+
+        await supabase
+          .from('account_data')
+          .update({
+            daily_drawdown: Number(newDD.toFixed(2)),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', accountIdRef.current);
+      } else {
+        // Local fallback
+        setAccount((prev) => {
+          const ddChange = (Math.random() - 0.45) * 0.1;
+          const newDD = Math.max(0, Math.min(prev.maxDailyDrawdown, prev.dailyDrawdown + ddChange));
+          return { ...prev, dailyDrawdown: Number(newDD.toFixed(2)) };
+        });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [user, isLive, account.dailyDrawdown, account.maxDailyDrawdown]);
+
+  // Load live data on mount
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const load = async () => {
+      const hasAccount = await fetchAccountData(user.id);
+      if (hasAccount) {
+        const hasAlerts = await fetchRiskAlerts(user.id);
+        if (!hasAlerts) {
+          await seedRiskAlerts(user.id);
+          await fetchRiskAlerts(user.id);
+        }
+      }
+      subscribeToAccountData(user.id);
+    };
+
+    load();
+
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+      }
+    };
+  }, [user?.id, fetchAccountData, fetchRiskAlerts, seedRiskAlerts, subscribeToAccountData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    if (user?.id) {
+      await Promise.all([fetchAccountData(user.id), fetchRiskAlerts(user.id)]);
+    }
+    setRefreshing(false);
+  }, [user?.id, fetchAccountData, fetchRiskAlerts]);
+
+  // Compute live daily loss as absolute dollar value
+  const liveDailyLossUSD = (account.balance * account.dailyDrawdown) / 100;
+  const maxDailyLossUSD = (account.balance * account.maxDailyDrawdown) / 100;
 
   return (
     <View style={styles.container}>
@@ -131,6 +403,13 @@ export default function RiskScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.voltrixAccent}
+          />
+        }
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
@@ -142,14 +421,23 @@ export default function RiskScreen() {
             <Text style={styles.title}>Risk Guard</Text>
             <Text style={styles.subtitle}>Voltrix Risk Monitor</Text>
           </View>
-          <Animated.View style={flashStyle}>
-            <View style={[styles.riskBadge, { backgroundColor: `${dailyRisk.color}15`, borderColor: `${dailyRisk.color}30` }]}>
-              <Ionicons name={dailyRisk.icon} size={14} color={dailyRisk.color} />
-              <Text style={[styles.riskBadgeText, { color: dailyRisk.color }]}>
-                {dailyRisk.level} RISK
+          <View style={styles.headerRight}>
+            {/* Live indicator */}
+            <View style={[styles.liveIndicator, { borderColor: isLive ? Colors.voltrixAccentGlow : Colors.borderDark }]}>
+              <View style={[styles.liveDot, { backgroundColor: isLive ? Colors.voltrixAccent : Colors.textTertiary }]} />
+              <Text style={[styles.liveText, { color: isLive ? Colors.voltrixAccent : Colors.textTertiary }]}>
+                {isLive ? 'LIVE' : 'OFF'}
               </Text>
             </View>
-          </Animated.View>
+            <Animated.View style={flashStyle}>
+              <View style={[styles.riskBadge, { backgroundColor: `${dailyRisk.color}15`, borderColor: `${dailyRisk.color}30` }]}>
+                <Ionicons name={dailyRisk.icon} size={14} color={dailyRisk.color} />
+                <Text style={[styles.riskBadgeText, { color: dailyRisk.color }]}>
+                  {dailyRisk.level}
+                </Text>
+              </View>
+            </Animated.View>
+          </View>
         </Animated.View>
 
         {/* Daily Drawdown Gauge */}
@@ -174,15 +462,15 @@ export default function RiskScreen() {
               </View>
               <View style={styles.gaugeStatDivider} />
               <View style={styles.gaugeStat}>
-                <Text style={styles.gaugeStatLabel}>Remaining</Text>
-                <Text style={[styles.gaugeStatValue, { fontFamily: Fonts.mono }]}>
-                  {(account.maxDailyDrawdown - account.dailyDrawdown).toFixed(1)}%
+                <Text style={styles.gaugeStatLabel}>Loss Today</Text>
+                <Text style={[styles.gaugeStatValue, { color: dailyRisk.color, fontFamily: Fonts.mono }]}>
+                  ${liveDailyLossUSD.toFixed(0)}
                 </Text>
               </View>
               <View style={styles.gaugeStatDivider} />
               <View style={styles.gaugeStat}>
                 <Text style={styles.gaugeStatLabel}>Max Limit</Text>
-                <Text style={[styles.gaugeStatValue, { color: Colors.textSecondary, fontFamily: Fonts.mono }]}>
+                <Text style={[styles.gaugeStatValue, { fontFamily: Fonts.mono }]}>
                   {account.maxDailyDrawdown.toFixed(1)}%
                 </Text>
               </View>
@@ -219,7 +507,7 @@ export default function RiskScreen() {
               </View>
               <Text style={styles.metricLabel}>Max Daily Loss</Text>
               <Text style={[styles.metricValue, { fontFamily: Fonts.mono }]}>
-                ${((account.balance * account.maxDailyDrawdown) / 100).toFixed(0)}
+                ${maxDailyLossUSD.toFixed(0)}
               </Text>
             </View>
             <View style={styles.metricCard}>
@@ -245,8 +533,8 @@ export default function RiskScreen() {
                 <Ionicons name="alert-circle-outline" size={18} color={Colors.crimsonRed} />
               </View>
               <Text style={styles.metricLabel}>Current Loss</Text>
-              <Text style={[styles.metricValue, { color: account.floatingPL >= 0 ? Colors.neonGreen : Colors.crimsonRed, fontFamily: Fonts.mono }]}>
-                {account.dailyDrawdown.toFixed(1)}%
+              <Text style={[styles.metricValue, { color: dailyRisk.color, fontFamily: Fonts.mono }]}>
+                {account.dailyDrawdown.toFixed(2)}%
               </Text>
             </View>
           </View>
@@ -256,27 +544,16 @@ export default function RiskScreen() {
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
           <Text style={styles.sectionTitle}>Recent Alerts</Text>
           <View style={styles.alertsContainer}>
-            <RiskAlert
-              icon="warning"
-              title="Approaching Daily Limit"
-              description="Drawdown at 46% of daily maximum. Consider reducing exposure."
-              color={Colors.orange}
-              timestamp="12 min ago"
-            />
-            <RiskAlert
-              icon="trending-down"
-              title="Drawdown Spike Detected"
-              description="USD/JPY position contributing -$306 to floating loss."
-              color={Colors.crimsonRed}
-              timestamp="24 min ago"
-            />
-            <RiskAlert
-              icon="shield-checkmark"
-              title="Risk Parameters Updated"
-              description="Daily drawdown limit set to 5.0%. Account drawdown limit set to 10.0%."
-              color={Colors.neonGreen}
-              timestamp="2h ago"
-            />
+            {riskAlerts.map((alert) => (
+              <RiskAlertCard
+                key={alert.id}
+                icon={alert.icon}
+                title={alert.title}
+                description={alert.description}
+                color={alert.color}
+                timestamp={alert.timestamp}
+              />
+            ))}
           </View>
         </Animated.View>
       </ScrollView>
@@ -334,6 +611,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.cardBg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  liveText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    fontFamily: Fonts.mono,
+  },
   riskBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,7 +690,7 @@ const styles = StyleSheet.create({
   },
   gaugeStatValue: {
     color: Colors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   progressCard: {},
@@ -506,5 +810,8 @@ const styles = StyleSheet.create({
   alertTime: {
     color: Colors.textTertiary,
     fontSize: 10,
+  },
+  orangeDim: {
+    backgroundColor: Colors.orangeDim,
   },
 });
