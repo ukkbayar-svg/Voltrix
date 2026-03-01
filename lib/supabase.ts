@@ -86,6 +86,15 @@ export interface DbProfile {
   email: string;
   created_at: string;
   is_approved: boolean;
+  push_token?: string | null;
+}
+
+export interface DbUserSignal {
+  id: string;
+  user_id: string;
+  signal_id: string;
+  entry_price: number;
+  followed_at: string;
 }
 
 // Ensure a profile row exists for the current user
@@ -113,6 +122,56 @@ export async function fetchAllProfiles(): Promise<DbProfile[]> {
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+// Update push token for a user profile
+export async function updatePushToken(userId: string, pushToken: string): Promise<void> {
+  await supabase
+    .from('profiles')
+    .update({ push_token: pushToken })
+    .eq('id', userId);
+}
+
+// Follow a signal (paper trading)
+export async function followSignal(userId: string, signalId: string, entryPrice: number): Promise<void> {
+  const { error } = await supabase
+    .from('user_signals')
+    .upsert(
+      { user_id: userId, signal_id: signalId, entry_price: entryPrice },
+      { onConflict: 'user_id,signal_id' }
+    );
+  if (error) throw error;
+}
+
+// Unfollow a signal
+export async function unfollowSignal(userId: string, signalId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_signals')
+    .delete()
+    .eq('user_id', userId)
+    .eq('signal_id', signalId);
+  if (error) throw error;
+}
+
+// Fetch all signals followed by user
+export async function fetchUserSignals(userId: string): Promise<DbUserSignal[]> {
+  const { data, error } = await supabase
+    .from('user_signals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('followed_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Fetch approved user push tokens (for sending notifications)
+export async function fetchApprovedPushTokens(): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .eq('is_approved', true)
+    .not('push_token', 'is', null);
+  return (data ?? []).map((p: { push_token: string | null }) => p.push_token).filter(Boolean) as string[];
 }
 
 // Admin: set approval status — restricted to master admin session only

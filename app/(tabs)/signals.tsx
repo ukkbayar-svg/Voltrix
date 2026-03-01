@@ -18,9 +18,10 @@ import { useTextGeneration } from '@fastshot/ai';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { mockSignals, Signal } from '@/constants/mockData';
 import SignalCard from '@/components/SignalCard';
-import { supabase, DbSignal } from '@/lib/supabase';
+import { supabase, DbSignal, followSignal, unfollowSignal, fetchUserSignals } from '@/lib/supabase';
 import { useApproval } from '@/lib/useApproval';
 import ApprovalWall from '@/components/ApprovalWall';
+import { useAuth } from '@fastshot/auth';
 
 type FilterType = 'all' | 'active' | 'hit_tp' | 'hit_sl' | 'pending';
 
@@ -71,7 +72,19 @@ function NewSignalChip({ count }: { count: number }) {
 }
 
 // Enhanced SignalCard wrapper with Verified badge
-function EnhancedSignalCard({ signal, onPress }: { signal: Signal; onPress: () => void }) {
+function EnhancedSignalCard({
+  signal,
+  onPress,
+  isFollowed,
+  onFollow,
+  onUnfollow,
+}: {
+  signal: Signal;
+  onPress: () => void;
+  isFollowed: boolean;
+  onFollow: (s: Signal) => Promise<void>;
+  onUnfollow: (s: Signal) => Promise<void>;
+}) {
   return (
     <View style={styles.signalCardWrapper}>
       {signal.status === 'hit_tp' && (
@@ -79,7 +92,14 @@ function EnhancedSignalCard({ signal, onPress }: { signal: Signal; onPress: () =
           <VerifiedBadge />
         </View>
       )}
-      <SignalCard signal={signal} onPress={onPress} />
+      <SignalCard
+        signal={signal}
+        onPress={onPress}
+        isFollowed={isFollowed}
+        onFollow={onFollow}
+        onUnfollow={onUnfollow}
+        showFollowButton
+      />
     </View>
   );
 }
@@ -87,6 +107,7 @@ function EnhancedSignalCard({ signal, onPress }: { signal: Signal; onPress: () =
 export default function SignalsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { isApproved, isAdmin, isLoading: approvalLoading } = useApproval();
   const [filter, setFilter] = useState<FilterType>('all');
   const [signals, setSignals] = useState<Signal[]>(mockSignals);
@@ -94,6 +115,7 @@ export default function SignalsScreen() {
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [newSignalCount, setNewSignalCount] = useState(0);
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
 
@@ -268,6 +290,37 @@ export default function SignalsScreen() {
     channelRef.current = channel;
   }, [generateInsightForSignal]);
 
+  // Load followed signals for current user
+  const loadFollowedSignals = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const userSigs = await fetchUserSignals(user.id);
+      setFollowedIds(new Set(userSigs.map((s) => s.signal_id)));
+    } catch {
+      // Table may not exist yet
+    }
+  }, [user?.id]);
+
+  // Follow a signal
+  const handleFollowSignal = useCallback(async (signal: Signal) => {
+    if (!user?.id) return;
+    await followSignal(user.id, signal.id, signal.entry);
+    setFollowedIds((prev) => new Set([...prev, signal.id]));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [user?.id]);
+
+  // Unfollow a signal
+  const handleUnfollowSignal = useCallback(async (signal: Signal) => {
+    if (!user?.id) return;
+    await unfollowSignal(user.id, signal.id);
+    setFollowedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(signal.id);
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [user?.id]);
+
   // Load on mount
   useEffect(() => {
     const init = async () => {
@@ -278,6 +331,7 @@ export default function SignalsScreen() {
       const signalsToProcess = liveSignals || mockSignals;
       await generateAIInsights(signalsToProcess);
       subscribeToSignals();
+      await loadFollowedSignals();
     };
 
     init();
@@ -287,7 +341,7 @@ export default function SignalsScreen() {
         channelRef.current.unsubscribe();
       }
     };
-  }, [fetchSignals, seedSignals, generateAIInsights, subscribeToSignals]);
+  }, [fetchSignals, seedSignals, generateAIInsights, subscribeToSignals, loadFollowedSignals]);
 
   const filteredSignals = signals.filter((s) => {
     if (filter === 'all') return true;
@@ -430,7 +484,13 @@ export default function SignalsScreen() {
           ) : (
             filteredSignals.map((signal, index) => (
               <Animated.View key={signal.id} entering={FadeInDown.delay(350 + index * 80).duration(400)}>
-                <EnhancedSignalCard signal={signal} onPress={() => handleSignalPress(signal)} />
+                <EnhancedSignalCard
+                  signal={signal}
+                  onPress={() => handleSignalPress(signal)}
+                  isFollowed={followedIds.has(signal.id)}
+                  onFollow={handleFollowSignal}
+                  onUnfollow={handleUnfollowSignal}
+                />
               </Animated.View>
             ))
           )}

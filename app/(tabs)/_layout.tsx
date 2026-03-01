@@ -84,6 +84,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="pulse"
+        options={{
+          title: 'Pulse',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={focused ? styles.activeIconBg : undefined}>
+              <Ionicons name={focused ? 'newspaper' : 'newspaper-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="trades"
+        options={{
+          title: 'My Trades',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={focused ? styles.activeIconBg : undefined}>
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="charts"
         options={{
           title: 'Charts',
