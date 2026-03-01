@@ -29,7 +29,7 @@ export default function RootLayout() {
       routes={{
         login: '/(auth)/login',
         afterLogin: '/(tabs)',
-        protected: ['tabs', 'app'],
+        protected: ['tabs', 'app', 'admin'],
         guest: ['auth'],
       }}
     >
@@ -53,6 +53,13 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen name="auth/callback" />
+        <Stack.Screen
+          name="admin"
+          options={{
+            gestureEnabled: false,
+            animation: 'fade',
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

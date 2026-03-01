@@ -19,6 +19,8 @@ import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { mockSignals, Signal } from '@/constants/mockData';
 import SignalCard from '@/components/SignalCard';
 import { supabase, DbSignal } from '@/lib/supabase';
+import { useApproval } from '@/lib/useApproval';
+import ApprovalWall from '@/components/ApprovalWall';
 
 type FilterType = 'all' | 'active' | 'hit_tp' | 'hit_sl' | 'pending';
 
@@ -85,6 +87,7 @@ function EnhancedSignalCard({ signal, onPress }: { signal: Signal; onPress: () =
 export default function SignalsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isApproved, isAdmin, isLoading: approvalLoading } = useApproval();
   const [filter, setFilter] = useState<FilterType>('all');
   const [signals, setSignals] = useState<Signal[]>(mockSignals);
   const [refreshing, setRefreshing] = useState(false);
@@ -313,6 +316,11 @@ export default function SignalsScreen() {
   const winRate = closedSignals.length > 0
     ? ((signals.filter((s) => s.status === 'hit_tp').length / closedSignals.length) * 100)
     : 0;
+
+  // Approval guard: block non-approved users from signal data
+  if (!approvalLoading && !isApproved && !isAdmin) {
+    return <ApprovalWall screenName="Signal Intelligence" />;
+  }
 
   return (
     <View style={styles.container}>

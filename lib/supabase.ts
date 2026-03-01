@@ -80,3 +80,46 @@ export interface DbRiskAlert {
   color: string;
   created_at: string;
 }
+
+export interface DbProfile {
+  id: string;
+  email: string;
+  created_at: string;
+  is_approved: boolean;
+}
+
+// Ensure a profile row exists for the current user
+export async function upsertProfile(userId: string, email: string): Promise<void> {
+  await supabase
+    .from('profiles')
+    .upsert({ id: userId, email, is_approved: false }, { onConflict: 'id', ignoreDuplicates: true });
+}
+
+// Fetch current user's approval status
+export async function fetchApprovalStatus(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_approved')
+    .eq('id', userId)
+    .single();
+  return data?.is_approved ?? false;
+}
+
+// Admin: fetch all profiles
+export async function fetchAllProfiles(): Promise<DbProfile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Admin: set approval status
+export async function setUserApproval(userId: string, approved: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_approved: approved })
+    .eq('id', userId);
+  if (error) throw error;
+}

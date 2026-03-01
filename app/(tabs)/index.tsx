@@ -28,6 +28,8 @@ import SparklineChart from '@/components/SparklineChart';
 import PulseBackground from '@/components/PulseBackground';
 import { supabase, DbAccountData, DbPosition } from '@/lib/supabase';
 import { useAuth } from '@fastshot/auth';
+import { useApproval } from '@/lib/useApproval';
+import ApprovalWall from '@/components/ApprovalWall';
 
 function formatCurrency(value: number, decimals = 2): string {
   const sign = value >= 0 ? '' : '-';
@@ -164,6 +166,7 @@ function generateFallbackSparkline(base: number): number[] {
 export default function CommandScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { isApproved, isAdmin, isLoading: approvalLoading } = useApproval();
   const [account, setAccount] = useState<AccountData>(mockAccount);
   const [positions, setPositions] = useState<Position[]>(mockPositions);
   const [refreshing, setRefreshing] = useState(false);
@@ -413,6 +416,11 @@ export default function CommandScreen() {
 
   const isPositivePL = account.floatingPL >= 0;
   const totalProfit = positions.reduce((sum, p) => sum + p.profit, 0);
+
+  // Approval guard: block non-approved users
+  if (!approvalLoading && !isApproved && !isAdmin) {
+    return <ApprovalWall screenName="Command Center" />;
+  }
 
   return (
     <View style={styles.container}>
