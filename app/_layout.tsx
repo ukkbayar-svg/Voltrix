@@ -32,45 +32,46 @@ function AppWithBiometric() {
     return unsubscribe;
   }, [user?.id, isApproved, isAdmin]);
 
-  // Show biometric screen if not authenticated yet
-  if (isSupported && !isAuthenticated) {
-    return (
-      <BiometricScreen
-        onAuthenticate={authenticate}
-        isAuthenticating={isAuthenticating}
-        error={error}
-      />
-    );
-  }
-
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#000000' },
-        animation: 'fade',
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
-      <Stack.Screen
-        name="signal/[id]"
-        options={{
-          presentation: 'card',
-          animation: 'slide_from_right',
-        }}
-      />
-      <Stack.Screen name="auth/callback" />
-      <Stack.Screen
-        name="admin"
-        options={{
-          gestureEnabled: false,
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#000000' },
           animation: 'fade',
         }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+        <Stack.Screen
+          name="signal/[id]"
+          options={{
+            presentation: 'card',
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen name="auth/callback" />
+        <Stack.Screen
+          name="admin"
+          options={{
+            gestureEnabled: false,
+            animation: 'fade',
+          }}
+        />
+      </Stack>
+      {/* Render BiometricScreen as an overlay so the Stack (and its
+          TextInputs) stays mounted. This prevents the keyboard from
+          being dismissed when biometric state changes. */}
+      {isSupported && !isAuthenticated && (
+        <BiometricScreen
+          onAuthenticate={authenticate}
+          isAuthenticating={isAuthenticating}
+          error={error}
+        />
+      )}
+    </>
   );
 }
 

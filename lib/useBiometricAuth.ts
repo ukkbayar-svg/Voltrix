@@ -21,6 +21,13 @@ export function useBiometricAuth(): BiometricAuthState {
   // True only when the app genuinely entered background (Home button / app switcher),
   // NOT when a system modal (biometric prompt, passcode sheet) briefly makes it inactive.
   const wasInTrueBackground = useRef(false);
+  // Timestamp of when the app entered background, used to distinguish genuine
+  // backgrounding (long) from keyboard-triggered false AppState flickers (< 2s).
+  const backgroundTimestampRef = useRef<number | null>(null);
+  // Minimum time (ms) the app must be in background before we re-lock.
+  // Keyboard-triggered background events on Android resolve in milliseconds;
+  // genuine backgrounding always exceeds this threshold.
+  const MIN_BACKGROUND_MS = 3000;
   // Keeps a stable reference to `isAuthenticating` so the AppState listener never
   // needs to be re-created when that flag flips, avoiding stale-closure issues.
   const isAuthenticatingRef = useRef(false);
@@ -122,21 +129,32 @@ export function useBiometricAuth(): BiometricAuthState {
       // Mark that the app truly backgrounded (not just a transient system overlay).
       if (nextState === 'background') {
         wasInTrueBackground.current = true;
+        backgroundTimestampRef.current = Date.now();
       }
 
       // App returned to foreground from GENUINE background → re-lock and prompt.
+      // Guard: only re-lock if the app was backgrounded for long enough to rule out
+      // keyboard-triggered false AppState flickers (which resolve in < 500 ms).
       if (
         nextState === 'active' &&
         wasInTrueBackground.current &&
         hasAuthenticatedOnce.current &&
         !isAuthenticatingRef.current
       ) {
+        const elapsed = backgroundTimestampRef.current
+          ? Date.now() - backgroundTimestampRef.current
+          : MIN_BACKGROUND_MS;
+
         wasInTrueBackground.current = false;
-        setIsAuthenticated(false);
-        setError(null);
-        setTimeout(() => {
-          authenticateRef.current?.();
-        }, 500);
+        backgroundTimestampRef.current = null;
+
+        if (elapsed >= MIN_BACKGROUND_MS) {
+          setIsAuthenticated(false);
+          setError(null);
+          setTimeout(() => {
+            authenticateRef.current?.();
+          }, 500);
+        }
       }
 
       // If we went inactive → active without ever hitting background (i.e. a
@@ -144,6 +162,7 @@ export function useBiometricAuth(): BiometricAuthState {
       // NOT re-lock.
       if (prevState === 'inactive' && nextState === 'active') {
         wasInTrueBackground.current = false;
+        backgroundTimestampRef.current = null;
       }
     });
 
