@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -28,6 +29,33 @@ import { useRouter } from 'expo-router';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { supabase, DbProfile, fetchAllProfiles, setUserApproval } from '@/lib/supabase';
 import * as Haptics from '@/lib/haptics';
+
+// SQL to paste into the Supabase dashboard → SQL Editor to set up the profiles table
+const SETUP_SQL = `-- Run this in your Supabase SQL Editor (https://supabase.com/dashboard)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email       TEXT,
+  is_approved BOOLEAN     NOT NULL DEFAULT false,
+  push_token  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "profiles: users can select own"
+  ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "profiles: users can insert own"
+  ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles: users can update own"
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles: master admin can select all"
+  ON public.profiles FOR SELECT TO authenticated
+  USING (auth.email() = 'ukbayar@gmail.com');
+CREATE POLICY "profiles: master admin can update all"
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (auth.email() = 'ukbayar@gmail.com')
+  WITH CHECK (auth.email() = 'ukbayar@gmail.com');`;
 
 // Status definitions
 const STATUS_CONFIG = {
@@ -226,6 +254,8 @@ export default function AdminScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Hard-coded security override: only this exact email is the master admin
@@ -240,12 +270,19 @@ export default function AdminScreen() {
 
   const loadProfiles = useCallback(async () => {
     setError(null);
+    setSetupRequired(false);
     try {
       const data = await fetchAllProfiles();
       // Filter out the master admin's own profile
       setProfiles(data.filter((p) => p.email !== 'ukbayar@gmail.com'));
-    } catch {
-      setError('Failed to load users. Ensure the profiles table exists in Supabase.');
+    } catch (err: unknown) {
+      const supabaseErr = err as { code?: string; message?: string };
+      // PGRST205 = table not found in schema cache; 42P01 = undefined_table
+      if (supabaseErr?.code === 'PGRST205' || supabaseErr?.code === '42P01') {
+        setSetupRequired(true);
+      } else {
+        setError(supabaseErr?.message ?? 'Failed to load users. Check your Supabase connection.');
+      }
     } finally {
       setInitialLoading(false);
       setRefreshing(false);
@@ -332,6 +369,17 @@ export default function AdminScreen() {
     await loadProfiles();
   }, [loadProfiles]);
 
+  const handleCopySQL = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Share.share({ message: SETUP_SQL, title: 'Profiles Table Setup SQL' });
+      setSqlCopied(true);
+      setTimeout(() => setSqlCopied(false), 2500);
+    } catch {
+      // User dismissed share sheet — no action needed
+    }
+  }, []);
+
   const handleSignOut = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await signOut?.();
@@ -414,19 +462,70 @@ export default function AdminScreen() {
           </View>
         )}
 
+        {/* Database setup required state */}
+        {setupRequired && !initialLoading && (
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.setupCard}>
+            <View style={styles.setupIconRow}>
+              <Ionicons name="server-outline" size={28} color="#A78BFA" />
+              <View style={styles.setupBadge}>
+                <Text style={styles.setupBadgeText}>ACTION REQUIRED</Text>
+              </View>
+            </View>
+            <Text style={styles.setupTitle}>Database Setup Required</Text>
+            <Text style={styles.setupDesc}>
+              The{' '}
+              <Text style={styles.setupMono}>profiles</Text>
+              {' '}table is missing from your Supabase project.{'\n'}
+              Copy the SQL below and run it in your Supabase SQL Editor.
+            </Text>
+
+            <View style={styles.sqlBlock}>
+              <Text style={styles.sqlCode} numberOfLines={6} ellipsizeMode="tail">
+                {SETUP_SQL}
+              </Text>
+            </View>
+
+            <View style={styles.setupActions}>
+              <Pressable style={styles.copyBtn} onPress={handleCopySQL}>
+                <Ionicons
+                  name={sqlCopied ? 'checkmark-circle' : 'copy-outline'}
+                  size={15}
+                  color={sqlCopied ? '#00E676' : '#A78BFA'}
+                />
+                <Text style={[styles.copyBtnText, sqlCopied && styles.copiedText]}>
+                  {sqlCopied ? 'Shared!' : 'Share SQL'}
+                </Text>
+              </Pressable>
+
+              <Pressable style={styles.retryBtn} onPress={loadProfiles}>
+                <Ionicons name="refresh" size={14} color={Colors.orange} />
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.setupHint}>
+              1. Go to supabase.com/dashboard{'\n'}
+              2. Select your project → SQL Editor{'\n'}
+              3. Paste and run the copied SQL{'\n'}
+              4. Press Retry above
+            </Text>
+          </Animated.View>
+        )}
+
         {/* Error state */}
-        {error && !initialLoading && (
+        {error && !initialLoading && !setupRequired && (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.errorCard}>
             <Ionicons name="warning" size={20} color={Colors.orange} />
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryBtn} onPress={loadProfiles}>
+            <Pressable style={[styles.retryBtn, styles.retryBtnRow]} onPress={loadProfiles}>
+              <Ionicons name="refresh" size={14} color={Colors.orange} />
               <Text style={styles.retryBtnText}>Retry</Text>
             </Pressable>
           </Animated.View>
         )}
 
         {/* Empty state */}
-        {!initialLoading && !error && profiles.length === 0 && (
+        {!initialLoading && !error && !setupRequired && profiles.length === 0 && (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
             <Ionicons name="people-outline" size={48} color={Colors.textTertiary} />
             <Text style={styles.emptyTitle}>No Users Yet</Text>
@@ -437,7 +536,7 @@ export default function AdminScreen() {
         )}
 
         {/* User rows */}
-        {!initialLoading &&
+        {!initialLoading && !setupRequired &&
           profiles.map((profile) => (
             <UserRow
               key={profile.id}
@@ -644,17 +743,118 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: 'rgba(255,159,10,0.18)',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
     borderColor: 'rgba(255,159,10,0.4)',
   },
+  retryBtnRow: {
+    alignSelf: 'center',
+    marginTop: 4,
+  },
   retryBtnText: {
     color: Colors.orange,
     fontSize: 13,
     fontWeight: '700',
+  },
+  // Setup required card
+  setupCard: {
+    backgroundColor: 'rgba(167,139,250,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.3)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: 12,
+  },
+  setupIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  setupBadge: {
+    backgroundColor: 'rgba(167,139,250,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  setupBadgeText: {
+    color: '#A78BFA',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    fontFamily: Fonts.mono,
+  },
+  setupTitle: {
+    color: Colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  setupDesc: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  setupMono: {
+    fontFamily: Fonts.mono,
+    color: '#A78BFA',
+  },
+  sqlBlock: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.2)',
+    padding: 12,
+  },
+  sqlCode: {
+    color: '#A78BFA',
+    fontSize: 10,
+    fontFamily: Fonts.mono,
+    lineHeight: 16,
+  },
+  setupActions: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(167,139,250,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.35)',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: BorderRadius.full,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  copyBtnText: {
+    color: '#A78BFA',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  copiedText: {
+    color: '#00E676',
+  },
+  setupHint: {
+    color: Colors.textTertiary,
+    fontSize: 11,
+    lineHeight: 18,
+    fontFamily: Fonts.mono,
+    backgroundColor: Colors.cardBg,
+    borderRadius: BorderRadius.md,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
   },
   emptyState: {
     alignItems: 'center',

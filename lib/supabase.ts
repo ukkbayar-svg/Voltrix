@@ -120,7 +120,12 @@ export async function fetchAllProfiles(): Promise<DbProfile[]> {
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    // Attach Supabase error code so callers can distinguish error types
+    const enriched = new Error(error.message) as Error & { code?: string };
+    enriched.code = error.code;
+    throw enriched;
+  }
   return data ?? [];
 }
 
