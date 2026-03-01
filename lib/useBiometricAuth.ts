@@ -15,8 +15,16 @@ export function useBiometricAuth(): BiometricAuthState {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const hasAuthenticatedOnce = useRef(false);
+  // True only when the app genuinely entered background (Home button / app switcher),
+  // NOT when a system modal (biometric prompt, passcode sheet) briefly makes it inactive.
+  const wasInTrueBackground = useRef(false);
+  // Keeps a stable reference to `isAuthenticating` so the AppState listener never
+  // needs to be re-created when that flag flips, avoiding stale-closure issues.
+  const isAuthenticatingRef = useRef(false);
+  const authenticateRef = useRef<(() => Promise<void>) | null>(null);
 
   // Check if biometric auth is available
   useEffect(() => {
@@ -42,8 +50,9 @@ export function useBiometricAuth(): BiometricAuthState {
   }, []);
 
   const authenticate = useCallback(async () => {
-    if (!isSupported || isAuthenticating) return;
+    if (!isSupported || isAuthenticatingRef.current) return;
 
+    isAuthenticatingRef.current = true;
     setIsAuthenticating(true);
     setError(null);
 
@@ -56,9 +65,9 @@ export function useBiometricAuth(): BiometricAuthState {
       });
 
       if (result.success) {
+        hasAuthenticatedOnce.current = true;
         setIsAuthenticated(true);
         setError(null);
-        hasAuthenticatedOnce.current = true;
       } else {
         switch (result.error) {
           case 'user_cancel':
@@ -68,9 +77,9 @@ export function useBiometricAuth(): BiometricAuthState {
             setError('Too many attempts. Try again later.');
             break;
           case 'user_fallback':
-            // User chose passcode - attempt again with passcode
-            setIsAuthenticated(true);
+            // User chose passcode fallback — still counts as authenticated
             hasAuthenticatedOnce.current = true;
+            setIsAuthenticated(true);
             break;
           default:
             setError('Authentication failed. Try again.');
@@ -79,11 +88,30 @@ export function useBiometricAuth(): BiometricAuthState {
     } catch {
       setError('Authentication failed. Try again.');
     } finally {
+      isAuthenticatingRef.current = false;
       setIsAuthenticating(false);
     }
-  }, [isSupported, isAuthenticating]);
+  }, [isSupported]);
 
-  // Re-authenticate when app comes to foreground
+  // Keep authenticateRef in sync so the AppState listener can always call the
+  // latest version without needing to re-subscribe.
+  useEffect(() => {
+    authenticateRef.current = authenticate;
+  }, [authenticate]);
+
+  // Re-authenticate ONLY when the app returns from true background.
+  //
+  // Key insight: iOS sends active → inactive when ANY system overlay appears
+  // (biometric prompt, passcode sheet, notifications, control centre, etc.).
+  // Only when the user presses the Home button / switches apps does the state
+  // continue from inactive → background.
+  //
+  // Strategy:
+  //   • Set wasInTrueBackground = true when we observe the 'background' state.
+  //   • Only re-lock & prompt when: wasInTrueBackground is true AND we just
+  //     became 'active' again.
+  //   • This prevents the biometric modal's own close event (inactive → active,
+  //     never touching 'background') from triggering another prompt.
   useEffect(() => {
     if (!isSupported) return;
 
@@ -91,24 +119,36 @@ export function useBiometricAuth(): BiometricAuthState {
       const prevState = appStateRef.current;
       appStateRef.current = nextState;
 
-      // App moved from background to foreground
+      // Mark that the app truly backgrounded (not just a transient system overlay).
+      if (nextState === 'background') {
+        wasInTrueBackground.current = true;
+      }
+
+      // App returned to foreground from GENUINE background → re-lock and prompt.
       if (
-        (prevState === 'background' || prevState === 'inactive') &&
         nextState === 'active' &&
-        hasAuthenticatedOnce.current
+        wasInTrueBackground.current &&
+        hasAuthenticatedOnce.current &&
+        !isAuthenticatingRef.current
       ) {
-        // Lock the screen and require re-authentication
+        wasInTrueBackground.current = false;
         setIsAuthenticated(false);
         setError(null);
-        // Auto-trigger auth after brief delay
         setTimeout(() => {
-          authenticate();
+          authenticateRef.current?.();
         }, 500);
+      }
+
+      // If we went inactive → active without ever hitting background (i.e. a
+      // system modal dismissed), clear the background flag just in case and do
+      // NOT re-lock.
+      if (prevState === 'inactive' && nextState === 'active') {
+        wasInTrueBackground.current = false;
       }
     });
 
     return () => subscription.remove();
-  }, [isSupported, authenticate]);
+  }, [isSupported]); // stable — no longer depends on `authenticate`
 
   // Auto-trigger on initial mount when supported
   useEffect(() => {
