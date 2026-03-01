@@ -1,7 +1,7 @@
 -- ============================================================
 -- VOLTRIX — Production Database Schema
 -- Migration: 001_voltrix_schema.sql
--- Target Project: qqhuwgpkdhbtlvmdjeax
+-- Target Project: gdomncxrobwwluoiqtbx
 -- Description: Core tables for account data, positions,
 --              trading signals, and risk alerts with RLS.
 -- ============================================================
