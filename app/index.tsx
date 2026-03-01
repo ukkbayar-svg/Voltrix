@@ -4,12 +4,14 @@ import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@fastshot/auth';
 import { Colors } from '@/constants/theme';
-import { ADMIN_EMAIL } from '@/lib/useApproval';
 
 export default function IndexScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const { user } = useAuth();
+
+  // Hard-coded security override: only this email has admin access
+  const isAdmin = user?.email === 'ukbayar@gmail.com';
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -34,7 +36,7 @@ export default function IndexScreen() {
   }
 
   // If admin logs in, send them to the hidden admin route
-  if (user?.email === ADMIN_EMAIL) {
+  if (isAdmin) {
     return <Redirect href="/admin" />;
   }
 

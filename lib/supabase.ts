@@ -115,8 +115,14 @@ export async function fetchAllProfiles(): Promise<DbProfile[]> {
   return data ?? [];
 }
 
-// Admin: set approval status
+// Admin: set approval status — restricted to master admin session only
 export async function setUserApproval(userId: string, approved: boolean): Promise<void> {
+  // Backend synchronization: verify the active authenticated session is the master admin
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user?.email !== 'ukbayar@gmail.com') {
+    throw new Error('Unauthorized: Only the master admin can modify approval status.');
+  }
+
   const { error } = await supabase
     .from('profiles')
     .update({ is_approved: approved })

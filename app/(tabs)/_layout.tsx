@@ -4,10 +4,15 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@fastshot/auth';
 import { Colors } from '@/constants/theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  // Hard-coded security override: Admin Panel entry point only visible to master admin
+  const isAdmin = user?.email === 'ukbayar@gmail.com';
 
   return (
     <Tabs
@@ -85,6 +90,20 @@ export default function TabLayout() {
           tabBarIcon: ({ focused, color }) => (
             <View style={focused ? styles.activeIconBg : undefined}>
               <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      {/* Admin Panel entry point — only visible to master admin (ukbayar@gmail.com) */}
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin',
+          // Conditional block: {isAdmin && <AdminTab />} — non-admins get href: null (hidden)
+          href: isAdmin ? undefined : null,
+          tabBarIcon: ({ focused, color }) => (
+            <View style={focused ? styles.activeIconBg : undefined}>
+              <Ionicons name={focused ? 'shield' : 'shield-outline'} size={22} color={color} />
             </View>
           ),
         }}

@@ -27,7 +27,6 @@ import { useAuth } from '@fastshot/auth';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { supabase, DbProfile, fetchAllProfiles, setUserApproval } from '@/lib/supabase';
-import { ADMIN_EMAIL } from '@/lib/useApproval';
 import * as Haptics from '@/lib/haptics';
 
 // Status definitions
@@ -229,19 +228,22 @@ export default function AdminScreen() {
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Security: redirect non-admins
+  // Hard-coded security override: only this exact email is the master admin
+  const isAdmin = user?.email === 'ukbayar@gmail.com';
+
+  // Route protection: instantly redirect any non-admin to Command screen
   useEffect(() => {
-    if (user && user.email !== ADMIN_EMAIL) {
+    if (user && !isAdmin) {
       router.replace('/(tabs)');
     }
-  }, [user, router]);
+  }, [user, isAdmin, router]);
 
   const loadProfiles = useCallback(async () => {
     setError(null);
     try {
       const data = await fetchAllProfiles();
-      // Filter out admin's own profile
-      setProfiles(data.filter((p) => p.email !== ADMIN_EMAIL));
+      // Filter out the master admin's own profile
+      setProfiles(data.filter((p) => p.email !== 'ukbayar@gmail.com'));
     } catch {
       setError('Failed to load users. Ensure the profiles table exists in Supabase.');
     } finally {
@@ -278,6 +280,9 @@ export default function AdminScreen() {
 
   const handleGrant = useCallback(
     async (userId: string) => {
+      // Backend synchronization: only execute if active session is the master admin
+      if (!isAdmin) return;
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setLoadingAction(userId);
       try {
@@ -296,11 +301,14 @@ export default function AdminScreen() {
         setLoadingAction(null);
       }
     },
-    []
+    [isAdmin]
   );
 
   const handleBlock = useCallback(
     async (userId: string) => {
+      // Backend synchronization: only execute if active session is the master admin
+      if (!isAdmin) return;
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setLoadingAction(userId);
       try {
@@ -315,7 +323,7 @@ export default function AdminScreen() {
         setLoadingAction(null);
       }
     },
-    []
+    [isAdmin]
   );
 
   const onRefresh = useCallback(async () => {
