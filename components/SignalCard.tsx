@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { StyleSheet, View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { Signal } from '@/constants/mockData';
 import SentimentGauge from './SentimentGauge';
 import { generateText } from '@fastshot/ai';
+import { useAuth } from '@/lib/auth';
 
 interface SignalCardProps {
   signal: Signal;
@@ -63,6 +64,14 @@ export default function SignalCard({
   onUnfollow,
   showFollowButton = false,
 }: SignalCardProps) {
+  const { user } = useAuth();
+
+  const watermark = useMemo(() => {
+    if (user?.email) return `VOLTRIX • ${user.email}`;
+    if (user?.id) return `VOLTRIX • ${user.id.slice(0, 8)}`;
+    return null;
+  }, [user?.email, user?.id]);
+
   const statusConfig = getStatusConfig(signal.status);
   const isBuy = signal.type === 'BUY';
   const sentiment = computeSentiment(signal);
@@ -86,15 +95,11 @@ export default function SignalCard({
       const reason = signal.technicalReason || 'Technical Analysis';
       const rsiMatch = reason.match(/RSI/i);
       const rsiVal = rsiMatch ? Math.floor(Math.random() * 30 + (isBuy ? 25 : 65)) : null;
-      const volStr = rsiMatch ? `Volume spike ${Math.floor(Math.random() * 40 + 120)}% above average` : 'Normal volume conditions';
+      const volStr = rsiMatch
+        ? `Volume spike ${Math.floor(Math.random() * 40 + 120)}% above average`
+        : 'Normal volume conditions';
 
-      const prompt = `You are Voltrix AI, a professional trading analyst. Explain in exactly 2 concise sentences why this trade was triggered:
-Signal: ${signal.symbol} ${signal.type} at ${signal.entry.toFixed(signal.entry > 100 ? 2 : 4)}
-Technical Reason: ${reason}
-RSI: ${rsiVal ? `${rsiVal} (${isBuy ? 'oversold' : 'overbought'})` : 'N/A'}
-Volume: ${volStr}
-Confidence: ${signal.confidence}%
-Keep it under 200 characters total. Be specific about the indicators.`;
+      const prompt = `You are Voltrix AI, a professional trading analyst. Explain in exactly 2 concise sentences why this trade was triggered:\nSignal: ${signal.symbol} ${signal.type} at ${signal.entry.toFixed(signal.entry > 100 ? 2 : 4)}\nTechnical Reason: ${reason}\nRSI: ${rsiVal ? `${rsiVal} (${isBuy ? 'oversold' : 'overbought'})` : 'N/A'}\nVolume: ${volStr}\nConfidence: ${signal.confidence}%\nKeep it under 200 characters total. Be specific about the indicators.`;
 
       const result = await generateText({ prompt });
       setReasoning(result || 'Signal triggered by confluence of technical indicators at key price levels.');
@@ -122,10 +127,15 @@ Keep it under 200 characters total. Be specific about the indicators.`;
   }, [isFollowed, onFollow, onUnfollow, signal]);
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+      {watermark ? (
+        <View style={styles.watermarkWrap} pointerEvents="none">
+          <Text style={styles.watermarkText} numberOfLines={1}>
+            {watermark}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.topRow}>
         <View style={styles.symbolRow}>
           <View style={[styles.typeBadge, { backgroundColor: isBuy ? Colors.neonGreenDim : Colors.crimsonRedDim }]}>
@@ -167,7 +177,20 @@ Keep it under 200 characters total. Be specific about the indicators.`;
         </View>
         <View style={styles.priceItem}>
           <Text style={styles.priceLabel}>CONF</Text>
-          <Text style={[styles.priceValue, { color: signal.confidence >= 80 ? Colors.neonGreen : signal.confidence >= 65 ? Colors.orange : Colors.textSecondary, fontFamily: Fonts.mono }]}>
+          <Text
+            style={[
+              styles.priceValue,
+              {
+                color:
+                  signal.confidence >= 80
+                    ? Colors.neonGreen
+                    : signal.confidence >= 65
+                      ? Colors.orange
+                      : Colors.textSecondary,
+                fontFamily: Fonts.mono,
+              },
+            ]}
+          >
             {signal.confidence}%
           </Text>
         </View>
@@ -223,8 +246,8 @@ Keep it under 200 characters total. Be specific about the indicators.`;
             {isLoadingReasoning
               ? 'Generating...'
               : showReasoning && reasoning
-              ? 'Hide Reasoning'
-              : 'AI Reasoning'}
+                ? 'Hide Reasoning'
+                : 'AI Reasoning'}
           </Text>
         </Pressable>
 
@@ -258,22 +281,16 @@ Keep it under 200 characters total. Be specific about the indicators.`;
             {isFollowLoading ? (
               <ActivityIndicator size="small" color={isFollowed ? Colors.neonGreen : Colors.voltrixAccent} />
             ) : (
-              <>
-                <Ionicons
-                  name={isFollowed ? 'checkmark-circle' : 'add-circle-outline'}
-                  size={14}
-                  color={isFollowed ? Colors.neonGreen : Colors.voltrixAccent}
-                />
-                <Text style={[styles.followBtnText, isFollowed && styles.followBtnTextActive]}>
-                  {isFollowed ? 'FOLLOWING' : 'FOLLOW'}
-                </Text>
-              </>
+              <Ionicons
+                name={isFollowed ? 'checkmark-circle' : 'add-circle'}
+                size={14}
+                color={isFollowed ? Colors.neonGreen : Colors.voltrixAccent}
+              />
             )}
+            <Text style={[styles.followBtnText, { color: isFollowed ? Colors.neonGreen : Colors.voltrixAccent }]}>
+              {isFollowed ? 'Following' : 'Follow'}
+            </Text>
           </Pressable>
-        )}
-
-        {!showFollowButton && (
-          <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
         )}
       </View>
     </Pressable>
@@ -283,105 +300,108 @@ Keep it under 200 characters total. Be specific about the indicators.`;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
     borderColor: Colors.borderDark,
-    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    gap: Spacing.md,
+    overflow: 'hidden',
   },
   cardPressed: {
-    backgroundColor: Colors.cardBgLight,
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+  },
+  watermarkWrap: {
+    position: 'absolute',
+    right: -60,
+    top: 26,
+    transform: [{ rotate: '-18deg' }],
+    opacity: 0.14,
+  },
+  watermarkText: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.4,
   },
   topRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    justifyContent: 'space-between',
   },
   symbolRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   typeText: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   symbol: {
     color: Colors.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '900',
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+    gap: 10,
   },
   priceItem: {
-    alignItems: 'center',
+    flex: 1,
   },
   priceLabel: {
     color: Colors.textTertiary,
     fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginBottom: 3,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   priceValue: {
     color: Colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 4,
   },
   sentimentSection: {
-    marginBottom: Spacing.md,
-    padding: Spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-    alignItems: 'center',
+    gap: 10,
   },
   sentimentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 6,
-    alignSelf: 'stretch',
+    gap: 6,
   },
   sentimentHeaderText: {
     color: Colors.textTertiary,
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 1,
-    fontFamily: Fonts.mono,
   },
   reasonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderDark,
-    marginBottom: Spacing.sm,
+    gap: 8,
   },
   reasonText: {
     color: Colors.textSecondary,
@@ -391,116 +411,103 @@ const styles = StyleSheet.create({
   aiRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
-    marginBottom: Spacing.sm,
-    backgroundColor: Colors.voltrixAccentDim,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
+    gap: 10,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(168, 85, 247, 0.22)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Colors.voltrixAccentDim,
+    borderWidth: 1,
+    borderColor: Colors.voltrixAccentGlow,
   },
   aiBadgeText: {
     color: Colors.voltrixAccent,
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.7,
   },
   aiText: {
     color: Colors.textSecondary,
     fontSize: 12,
     flex: 1,
-    lineHeight: 17,
+    lineHeight: 16,
   },
   reasoningSection: {
-    marginBottom: Spacing.sm,
+    gap: 10,
   },
   reasoningBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.voltrixAccentDim,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(168, 85, 247, 0.08)',
     borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
+    borderColor: 'rgba(168, 85, 247, 0.20)',
     alignSelf: 'flex-start',
   },
   reasoningBtnText: {
     color: Colors.voltrixAccent,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    fontFamily: Fonts.mono,
+    fontSize: 12,
+    fontWeight: '800',
   },
   reasoningBlock: {
-    marginTop: 8,
-    backgroundColor: 'rgba(168, 85, 247, 0.06)',
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.md,
+    padding: 12,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.2)',
+    borderColor: Colors.borderDark,
+    gap: 8,
   },
   reasoningHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 6,
+    gap: 6,
   },
   reasoningHeaderText: {
-    color: Colors.voltrixAccent,
-    fontSize: 9,
+    color: Colors.textTertiary,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.5,
-    fontFamily: Fonts.mono,
+    letterSpacing: 1,
   },
   reasoningText: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 16,
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.sm,
+    justifyContent: 'space-between',
   },
   timeText: {
     color: Colors.textTertiary,
     fontSize: 11,
+    fontFamily: Fonts.mono,
   },
   followBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.voltrixAccentDim,
+    paddingVertical: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: Colors.voltrixAccentGlow,
+    backgroundColor: Colors.voltrixAccentDim,
   },
   followBtnActive: {
-    backgroundColor: Colors.neonGreenDim,
-    borderColor: Colors.neonGreenGlow,
+    borderColor: 'rgba(0, 230, 118, 0.25)',
+    backgroundColor: 'rgba(0, 230, 118, 0.10)',
   },
   followBtnText: {
-    color: Colors.voltrixAccent,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    fontFamily: Fonts.mono,
-  },
-  followBtnTextActive: {
-    color: Colors.neonGreen,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
 });

@@ -36,14 +36,18 @@ export default function IndexScreen() {
     );
   }
 
+  if (!hasOnboarded) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  // Require sign-in to access the app
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   // If admin logs in, send them to the hidden admin route
   if (isAdmin) {
     return <Redirect href="/admin" />;
-  }
-
-  // Always allow entering the app (guest browsing). Onboarding gates first-time users only.
-  if (!hasOnboarded) {
-    return <Redirect href="/onboarding" />;
   }
 
   return <Redirect href="/(tabs)" />;

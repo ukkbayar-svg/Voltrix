@@ -3,7 +3,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { supabase } from '@/lib/supabase';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useBiometricAuth } from '@/lib/useBiometricAuth';
 import BiometricScreen from '@/components/BiometricScreen';
@@ -12,7 +11,15 @@ import { useApproval } from '@/lib/useApproval';
 
 SplashScreen.preventAutoHideAsync();
 
-function AuthRouteGuard() {
+function AuthRouteGuard({
+  isApproved,
+  isAdmin,
+  approvalLoading,
+}: {
+  isApproved: boolean;
+  isAdmin: boolean;
+  approvalLoading: boolean;
+}) {
   const router = useRouter();
   const segments = useSegments();
   const { user, isInitialized } = useAuth();
@@ -29,8 +36,10 @@ function AuthRouteGuard() {
       root === 'signup' ||
       root === 'forgot-password';
 
-    // Only admin route is truly protected in this app (tabs can be browsed as guest).
-    const isProtected = root === 'admin';
+    const isPendingRoute = root === 'pending';
+
+    // Onboarding and auth routes are always reachable.
+    const isProtected = root === '(tabs)' || root === 'signal' || root === 'admin' || isPendingRoute;
 
     if (!user && isProtected) {
       router.replace('/(auth)/login');
@@ -39,8 +48,20 @@ function AuthRouteGuard() {
 
     if (user && inAuth) {
       router.replace('/');
+      return;
     }
-  }, [segments, router, user, isInitialized]);
+
+    // Signed-in but not approved → block all app content until admin approves.
+    if (user && !isAdmin && !approvalLoading && !isApproved && !inAuth && root !== 'onboarding' && !isPendingRoute) {
+      router.replace('/pending');
+      return;
+    }
+
+    // Approved users should never stay on the pending screen.
+    if (user && !approvalLoading && (isApproved || isAdmin) && isPendingRoute) {
+      router.replace('/(tabs)');
+    }
+  }, [segments, router, user, isInitialized, isApproved, isAdmin, approvalLoading]);
 
   return null;
 }
@@ -48,7 +69,7 @@ function AuthRouteGuard() {
 function AppWithBiometric() {
   const { isAuthenticated, isAuthenticating, isSupported, error, authenticate } = useBiometricAuth();
   const { user } = useAuth();
-  const { isApproved, isAdmin } = useApproval();
+  const { isApproved, isAdmin, isLoading: approvalLoading } = useApproval();
 
   // Register push notifications when user logs in
   useEffect(() => {
@@ -67,7 +88,7 @@ function AppWithBiometric() {
 
   return (
     <>
-      <AuthRouteGuard />
+      <AuthRouteGuard isApproved={isApproved} isAdmin={isAdmin} approvalLoading={approvalLoading} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -78,6 +99,7 @@ function AppWithBiometric() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="pending" options={{ gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
         <Stack.Screen
           name="signal/[id]"

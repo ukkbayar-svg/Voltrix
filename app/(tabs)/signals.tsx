@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -16,7 +16,7 @@ import * as Haptics from '@/lib/haptics';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useTextGeneration } from '@fastshot/ai';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
-import { mockSignals, Signal } from '@/constants/mockData';
+import { Signal } from '@/constants/mockData';
 import SignalCard from '@/components/SignalCard';
 import { supabase, DbSignal, followSignal, unfollowSignal, fetchUserSignals } from '@/lib/supabase';
 import { useApproval } from '@/lib/useApproval';
@@ -110,7 +110,7 @@ export default function SignalsScreen() {
   const { user } = useAuth();
   const { isApproved, isAdmin, isLoading: approvalLoading } = useApproval();
   const [filter, setFilter] = useState<FilterType>('all');
-  const [signals, setSignals] = useState<Signal[]>(mockSignals);
+  const [signals, setSignals] = useState<Signal[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [isLive, setIsLive] = useState(false);
@@ -121,123 +121,94 @@ export default function SignalsScreen() {
 
   const { generateText } = useTextGeneration();
 
+  const canAccess = isAdmin || isApproved;
+
   // Generate AI insights for a single signal
-  const generateInsightForSignal = useCallback(async (signal: Signal): Promise<string> => {
-    try {
-      const prompt = `You are Voltrix AI, a professional forex trading analyst. Given this trade signal for ${signal.symbol} (${signal.type} at ${signal.entry}, SL: ${signal.sl}, TP: ${signal.tp}), with the technical reason "${signal.technicalReason || 'Technical Analysis'}", provide a concise 1-2 sentence AI insight explaining the technical logic and market context. Be specific about indicators and price action. Keep it under 150 characters.`;
-      const result = await generateText(prompt);
-      return result || '';
-    } catch {
-      return '';
-    }
-  }, [generateText]);
+  const generateInsightForSignal = useCallback(
+    async (signal: Signal): Promise<string> => {
+      try {
+        const prompt = `You are Voltrix AI, a professional forex trading analyst. Given this trade signal for ${signal.symbol} (${signal.type} at ${signal.entry}, SL: ${signal.sl}, TP: ${signal.tp}), with the technical reason "${signal.technicalReason || 'Technical Analysis'}", provide a concise 1-2 sentence AI insight explaining the technical logic and market context. Be specific about indicators and price action. Keep it under 150 characters.`;
+        const result = await generateText(prompt);
+        return result || '';
+      } catch {
+        return '';
+      }
+    },
+    [generateText]
+  );
 
   // Generate AI insights for signals that don't have them
-  const generateAIInsights = useCallback(async (signalList: Signal[]) => {
-    setLoadingInsights(true);
-    try {
-      const signalsNeedingInsights = signalList.filter((s) => !s.aiInsight);
-      if (signalsNeedingInsights.length === 0) {
-        setLoadingInsights(false);
-        return signalList;
-      }
+  const generateAIInsights = useCallback(
+    async (signalList: Signal[]) => {
+      if (!isAdmin) return signalList;
 
-      const updatedSignals = [...signalList];
+      setLoadingInsights(true);
+      try {
+        const signalsNeedingInsights = signalList.filter((s) => !s.aiInsight);
+        if (signalsNeedingInsights.length === 0) {
+          setLoadingInsights(false);
+          return signalList;
+        }
 
-      for (const signal of signalsNeedingInsights) {
-        const insight = await generateInsightForSignal(signal);
-        if (insight) {
-          const index = updatedSignals.findIndex((s) => s.id === signal.id);
-          if (index !== -1) {
-            updatedSignals[index] = { ...updatedSignals[index], aiInsight: insight };
-            // Save insight to Supabase if using live data
-            supabase
-              .from('signals')
-              .update({ ai_insight: insight })
-              .eq('id', signal.id)
-              .then(
-                () => {},
-                () => {}
-              );
+        const updatedSignals = [...signalList];
+
+        for (const signal of signalsNeedingInsights) {
+          const insight = await generateInsightForSignal(signal);
+          if (insight) {
+            const index = updatedSignals.findIndex((s) => s.id === signal.id);
+            if (index !== -1) {
+              updatedSignals[index] = { ...updatedSignals[index], aiInsight: insight };
+              // Only admin is allowed to update signals in Supabase.
+              supabase
+                .from('signals')
+                .update({ ai_insight: insight })
+                .eq('id', signal.id)
+                .then(
+                  () => {},
+                  () => {}
+                );
+            }
           }
         }
-      }
 
-      setSignals(updatedSignals);
-      return updatedSignals;
-    } catch {
-      return signalList;
-    } finally {
-      setLoadingInsights(false);
-    }
-  }, [generateInsightForSignal]);
+        setSignals(updatedSignals);
+        return updatedSignals;
+      } catch {
+        return signalList;
+      } finally {
+        setLoadingInsights(false);
+      }
+    },
+    [generateInsightForSignal, isAdmin]
+  );
 
   // Fetch signals from Supabase
   const fetchSignals = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('signals')
-        .select('*')
-        .order('created_at', { ascending: false });
+    if (!canAccess) return;
 
-      if (error) {
-        const e = new Error(error.message || 'Failed to fetch signals') as Error & { code?: string };
-        e.code = (error as { code?: string }).code;
-        throw e;
-      }
+    const { data, error } = await supabase
+      .from('signals')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (data && data.length > 0) {
-        const converted = data.map(dbToSignal);
-        // Track seen IDs
-        converted.forEach((s) => seenIdsRef.current.add(s.id));
-        setSignals(converted);
-        setIsLive(true);
-        return converted;
-      }
-    } catch {
-      // Fall back to mock signals and seed Supabase
-      // seedSignals called in init
+    if (error) {
+      const e = new Error(error.message || 'Failed to fetch signals') as Error & { code?: string };
+      e.code = (error as { code?: string }).code;
+      throw e;
     }
-    return null;
-  }, []);
 
-  // Seed initial signals to Supabase
-  const seedSignals = useCallback(async () => {
-    try {
-      const { data: existing } = await supabase
-        .from('signals')
-        .select('id')
-        .limit(1);
+    const converted = (data ?? []).map(dbToSignal);
+    converted.forEach((s) => seenIdsRef.current.add(s.id));
+    setSignals(converted);
+    setIsLive(converted.length > 0);
 
-      if (!existing || existing.length === 0) {
-        const toInsert = mockSignals.map((s) => ({
-          symbol: s.symbol,
-          type: s.type,
-          entry: s.entry,
-          sl: s.sl,
-          tp: s.tp,
-          status: s.status,
-          confidence: s.confidence,
-          technical_reason: s.technicalReason || null,
-          ai_insight: s.aiInsight || null,
-        }));
-        const { data } = await supabase.from('signals').insert(toInsert).select();
-        if (data) {
-          const converted = data.map(dbToSignal);
-          converted.forEach((s) => seenIdsRef.current.add(s.id));
-          setSignals(converted);
-          setIsLive(true);
-          return converted;
-        }
-      }
-    } catch {
-      // Table doesn't exist yet, use mock
-    }
-    return null;
-  }, []);
+    await generateAIInsights(converted);
+  }, [canAccess, generateAIInsights]);
 
   // Subscribe to real-time signal changes
   const subscribeToSignals = useCallback(() => {
+    if (!canAccess) return;
+
     if (channelRef.current) {
       void channelRef.current.unsubscribe().catch(() => {});
     }
@@ -254,73 +225,76 @@ export default function SignalsScreen() {
         async (payload) => {
           const newSignal = dbToSignal(payload.new as DbSignal);
 
-          // Only notify if we haven't seen this signal
           if (!seenIdsRef.current.has(newSignal.id)) {
             seenIdsRef.current.add(newSignal.id);
             setNewSignalCount((c) => c + 1);
             setSignals((prev) => [newSignal, ...prev]);
-
-            // Immediately generate AI insight for new signal
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            const insight = await generateInsightForSignal(newSignal);
-            if (insight) {
-              setSignals((prev) =>
-                prev.map((s) => s.id === newSignal.id ? { ...s, aiInsight: insight } : s)
-              );
-              supabase
-                .from('signals')
-                .update({ ai_insight: insight })
-                .eq('id', newSignal.id)
-                .then(
-                  () => {},
-                  () => {}
-                );
-            }
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'signals',
-        },
-        (payload) => {
-          const updatedSignal = dbToSignal(payload.new as DbSignal);
-          setSignals((prev) =>
-            prev.map((s) => s.id === updatedSignal.id ? updatedSignal : s)
-          );
-        }
-      )
-      .subscribe((status) => {
-        setIsLive(status === 'SUBSCRIBED');
-      });
+      .subscribe();
 
     channelRef.current = channel;
-  }, [generateInsightForSignal]);
+  }, [canAccess]);
 
-  // Load followed signals for current user
-  const loadFollowedSignals = useCallback(async () => {
+  // Load followed IDs
+  const loadFollowed = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const userSigs = await fetchUserSignals(user.id);
-      setFollowedIds(new Set(userSigs.map((s) => s.signal_id)));
+      const data = await fetchUserSignals(user.id);
+      setFollowedIds(new Set(data.map((x) => x.signal_id)));
     } catch {
-      // Table may not exist yet
+      setFollowedIds(new Set());
     }
   }, [user?.id]);
 
-  // Follow a signal
-  const handleFollowSignal = useCallback(async (signal: Signal) => {
+  useEffect(() => {
+    if (approvalLoading) return;
+    if (!canAccess) return;
+
+    void fetchSignals().catch(() => {
+      setSignals([]);
+      setIsLive(false);
+    });
+    subscribeToSignals();
+    void loadFollowed();
+
+    return () => {
+      if (channelRef.current) {
+        void channelRef.current.unsubscribe().catch(() => {});
+      }
+    };
+  }, [fetchSignals, subscribeToSignals, loadFollowed, canAccess, approvalLoading]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchSignals().catch(() => {
+        setSignals([]);
+        setIsLive(false);
+      }),
+      loadFollowed(),
+    ]);
+    setRefreshing(false);
+  };
+
+  const filteredSignals = useMemo(() => {
+    if (filter === 'all') return signals;
+    return signals.filter((s) => s.status === filter);
+  }, [signals, filter]);
+
+  const handlePressSignal = (signal: Signal) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/signal/${signal.id}`);
+  };
+
+  const handleFollow = async (signal: Signal) => {
     if (!user?.id) return;
     await followSignal(user.id, signal.id, signal.entry);
-    setFollowedIds((prev) => new Set([...prev, signal.id]));
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [user?.id]);
+    setFollowedIds((prev) => new Set(prev).add(signal.id));
+  };
 
-  // Unfollow a signal
-  const handleUnfollowSignal = useCallback(async (signal: Signal) => {
+  const handleUnfollow = async (signal: Signal) => {
     if (!user?.id) return;
     await unfollowSignal(user.id, signal.id);
     setFollowedIds((prev) => {
@@ -328,183 +302,88 @@ export default function SignalsScreen() {
       next.delete(signal.id);
       return next;
     });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [user?.id]);
-
-  // Load on mount
-  useEffect(() => {
-    const init = async () => {
-      let liveSignals = await fetchSignals();
-      if (!liveSignals) {
-        liveSignals = await seedSignals();
-      }
-      const signalsToProcess = liveSignals || mockSignals;
-      await generateAIInsights(signalsToProcess);
-      subscribeToSignals();
-      await loadFollowedSignals();
-    };
-
-    init();
-
-    return () => {
-      if (channelRef.current) {
-        void channelRef.current.unsubscribe().catch(() => {});
-      }
-    };
-  }, [fetchSignals, seedSignals, generateAIInsights, subscribeToSignals, loadFollowedSignals]);
-
-  const filteredSignals = signals.filter((s) => {
-    if (filter === 'all') return true;
-    return s.status === filter;
-  });
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setNewSignalCount(0);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const liveSignals = await fetchSignals();
-    await generateAIInsights(liveSignals || signals);
-    setRefreshing(false);
-  }, [fetchSignals, generateAIInsights, signals]);
-
-  const handleSignalPress = (signal: Signal) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
-      pathname: '/signal/[id]',
-      params: { id: signal.id },
-    });
   };
 
-  const activeCount = signals.filter((s) => s.status === 'active').length;
-  const closedSignals = signals.filter((s) => s.status !== 'pending' && s.status !== 'active');
-  const winRate = closedSignals.length > 0
-    ? ((signals.filter((s) => s.status === 'hit_tp').length / closedSignals.length) * 100)
-    : 0;
+  if (approvalLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar style="light" />
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={Colors.voltrixAccent} />
+          <Text style={styles.loadingText}>Checking access…</Text>
+        </View>
+      </View>
+    );
+  }
 
-  // Approval guard: block non-approved users from signal data
-  if (!approvalLoading && !isApproved && !isAdmin) {
-    return <ApprovalWall screenName="Signal Intelligence" />;
+  if (!canAccess) {
+    return <ApprovalWall screenName="Signals" />;
   }
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 100 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: 110 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.voltrixAccent}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.voltrixAccent} />}
       >
-        {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.brandRow}>
-              <View style={styles.voltrixDot} />
-              <Text style={styles.brandTag}>VOLTRIX</Text>
-            </View>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>Signals</Text>
-              <NewSignalChip count={newSignalCount} />
-            </View>
-            <Text style={styles.subtitle}>Voltrix AI Trade Insights</Text>
+          <View>
+            <Text style={styles.title}>Signals</Text>
+            <Text style={styles.subtitle}>Premium trade alerts (approved users only)</Text>
           </View>
-          <View style={styles.headerActions}>
-            {/* Live indicator */}
+          <View style={styles.headerRight}>
+            <NewSignalChip count={newSignalCount} />
             <View style={[styles.liveIndicator, { borderColor: isLive ? Colors.voltrixAccentGlow : Colors.borderDark }]}>
               <View style={[styles.liveDot, { backgroundColor: isLive ? Colors.voltrixAccent : Colors.textTertiary }]} />
               <Text style={[styles.liveText, { color: isLive ? Colors.voltrixAccent : Colors.textTertiary }]}>
                 {isLive ? 'LIVE' : 'OFF'}
               </Text>
             </View>
-            {loadingInsights && (
-              <View style={styles.aiLoadingBadge}>
-                <ActivityIndicator size="small" color={Colors.voltrixAccent} />
-                <Text style={styles.aiLoadingText}>AI...</Text>
-              </View>
-            )}
           </View>
         </Animated.View>
 
-        {/* Stats Row */}
-        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{signals.length}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: Colors.neonGreen }]}>{activeCount}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: Colors.voltrixAccent, fontFamily: Fonts.mono }]}>
-              {winRate.toFixed(0)}%
-            </Text>
-            <Text style={styles.statLabel}>Win Rate</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={styles.statIconRow}>
-              <Ionicons name="checkmark-circle" size={14} color={Colors.neonGreen} />
-              <Text style={[styles.statValue, { color: Colors.neonGreen, fontSize: 16 }]}>
-                {signals.filter((s) => s.status === 'hit_tp').length}
-              </Text>
-            </View>
-            <Text style={styles.statLabel}>Verified</Text>
-          </View>
-        </Animated.View>
-
-        {/* Filter Tabs */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
-            {filterOptions.map((opt) => (
-              <Pressable
-                key={opt.key}
-                style={[styles.filterChip, filter === opt.key && styles.filterChipActive]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setFilter(opt.key);
-                  setNewSignalCount(0);
-                }}
-              >
-                <Text style={[styles.filterText, filter === opt.key && styles.filterTextActive]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
+        <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.filterRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
+            {filterOptions.map((opt) => {
+              const active = opt.key === filter;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setFilter(opt.key)}
+                  style={[styles.filterBtn, active && styles.filterBtnActive]}
+                >
+                  <Text style={[styles.filterText, active && styles.filterTextActive]}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </Animated.View>
 
-        {/* Signals Feed */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          {filteredSignals.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="radio-outline" size={48} color={Colors.textTertiary} />
-              <Text style={styles.emptyText}>No signals found</Text>
-              <Text style={styles.emptySubtext}>Try a different filter</Text>
-            </View>
-          ) : (
-            filteredSignals.map((signal, index) => (
-              <Animated.View key={signal.id} entering={FadeInDown.delay(350 + index * 80).duration(400)}>
+        {filteredSignals.length === 0 ? (
+          <Animated.View entering={FadeInDown.delay(140).duration(500)} style={styles.emptyState}>
+            <Ionicons name="sparkles-outline" size={22} color={Colors.textTertiary} />
+            <Text style={styles.emptyTitle}>No signals yet</Text>
+            <Text style={styles.emptyText}>When the admin publishes signals, they'll appear here.</Text>
+          </Animated.View>
+        ) : (
+          <View style={styles.list}>
+            {filteredSignals.map((signal, idx) => (
+              <Animated.View key={signal.id} entering={FadeInDown.delay(140 + idx * 35).duration(450)}>
                 <EnhancedSignalCard
                   signal={signal}
-                  onPress={() => handleSignalPress(signal)}
+                  onPress={() => handlePressSignal(signal)}
                   isFollowed={followedIds.has(signal.id)}
-                  onFollow={handleFollowSignal}
-                  onUnfollow={handleUnfollowSignal}
+                  onFollow={handleFollow}
+                  onUnfollow={handleUnfollow}
                 />
               </Animated.View>
-            ))
-          )}
-        </Animated.View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -519,215 +398,153 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.lg,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  voltrixDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.voltrixAccent,
-    shadowColor: Colors.voltrixAccent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 4,
-  },
-  brandTag: {
-    color: Colors.voltrixAccent,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2.5,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    marginBottom: 14,
   },
   title: {
     color: Colors.textPrimary,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.8,
-  },
-  newSignalChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.voltrixAccentDim,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
-  },
-  newDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: Colors.voltrixAccent,
-  },
-  newSignalText: {
-    color: Colors.voltrixAccent,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
-    fontFamily: Fonts.mono,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -0.4,
   },
   subtitle: {
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     fontSize: 13,
-    marginTop: 2,
+    marginTop: 4,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+    gap: 10,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.cardBg,
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
   },
   liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 99,
   },
   liveText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    fontFamily: Fonts.mono,
-  },
-  aiLoadingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.voltrixAccentDim,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
-  },
-  aiLoadingText: {
-    color: Colors.voltrixAccent,
     fontSize: 11,
-    fontWeight: '600',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.md,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-  },
-  statIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  statValue: {
-    color: Colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  statLabel: {
-    color: Colors.textTertiary,
-    fontSize: 10,
-    fontWeight: '500',
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   filterRow: {
-    gap: 8,
-    paddingVertical: 2,
+    marginBottom: 10,
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.cardBg,
+  filterContent: {
+    gap: 8,
+    paddingVertical: 6,
+  },
+  filterBtn: {
     borderWidth: 1,
     borderColor: Colors.borderDark,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  filterChipActive: {
+  filterBtnActive: {
+    borderColor: Colors.voltrixAccentGlow,
     backgroundColor: Colors.voltrixAccentDim,
-    borderColor: Colors.voltrixAccent,
   },
   filterText: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   filterTextActive: {
     color: Colors.voltrixAccent,
   },
+  list: {
+    gap: 12,
+    paddingTop: 10,
+  },
   signalCardWrapper: {
     position: 'relative',
-    marginBottom: 2,
   },
   verifiedOverlay: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    right: 12,
+    top: 12,
     zIndex: 10,
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
     backgroundColor: Colors.neonGreenDim,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: Colors.neonGreenGlow,
+    borderColor: 'rgba(0, 230, 118, 0.25)',
   },
   verifiedText: {
     color: Colors.neonGreen,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
-    fontFamily: Fonts.mono,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  newSignalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  newDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: Colors.voltrixAccent,
+  },
+  newSignalText: {
+    color: Colors.textPrimary,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   emptyState: {
+    paddingTop: 70,
     alignItems: 'center',
-    paddingVertical: 60,
-    gap: 8,
+    gap: 10,
+  },
+  emptyTitle: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
   },
   emptyText: {
     color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    textAlign: 'center',
+    maxWidth: 320,
+    lineHeight: 18,
   },
-  emptySubtext: {
-    color: Colors.textTertiary,
+  loadingBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    color: Colors.textSecondary,
     fontSize: 13,
   },
 });

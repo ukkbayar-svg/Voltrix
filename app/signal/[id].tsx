@@ -15,9 +15,11 @@ import * as Haptics from '@/lib/haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTextGeneration } from '@fastshot/ai';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
-import { mockSignals, generateCandlestickData, Signal } from '@/constants/mockData';
 import CandlestickChart from '@/components/CandlestickChart';
 import GlassContainer from '@/components/GlassContainer';
+import { supabase, DbSignal } from '@/lib/supabase';
+import { Signal, generateCandlestickData } from '@/constants/mockData';
+import { useAuth } from '@/lib/auth';
 
 function getStatusConfig(status: Signal['status']) {
   switch (status) {
@@ -32,16 +34,54 @@ function getStatusConfig(status: Signal['status']) {
   }
 }
 
+function dbToSignal(db: DbSignal): Signal {
+  return {
+    id: db.id,
+    symbol: db.symbol,
+    type: db.type,
+    entry: Number(db.entry),
+    sl: Number(db.sl),
+    tp: Number(db.tp),
+    timestamp: db.created_at,
+    status: db.status,
+    confidence: db.confidence,
+    aiInsight: db.ai_insight || undefined,
+    technicalReason: db.technical_reason || undefined,
+  };
+}
+
 export default function SignalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  const [signal, setSignal] = useState<Signal | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
 
   const { generateText } = useTextGeneration();
 
-  const signal = mockSignals.find((s) => s.id === id);
+  useEffect(() => {
+    const run = async () => {
+      if (!id) return;
+      setLoading(true);
+
+      const { data, error } = await supabase.from('signals').select('*').eq('id', id).maybeSingle();
+      if (error || !data) {
+        setSignal(null);
+        setLoading(false);
+        return;
+      }
+
+      setSignal(dbToSignal(data as DbSignal));
+      setLoading(false);
+    };
+
+    void run();
+  }, [id]);
 
   const chartData = useMemo(() => {
     if (!signal) return [];
@@ -55,20 +95,7 @@ export default function SignalDetailScreen() {
     const fetchAI = async () => {
       setLoadingAI(true);
       try {
-        const prompt = `You are Voltrix AI, a senior forex trading analyst for the Voltrix platform. Analyze this trade signal in detail:
-- Pair: ${signal.symbol}
-- Direction: ${signal.type}
-- Entry: ${signal.entry}
-- Stop Loss: ${signal.sl}
-- Take Profit: ${signal.tp}
-- Technical Pattern: ${signal.technicalReason}
-- Status: ${signal.status}
-
-Provide a detailed 3-4 sentence professional analysis covering:
-1. The technical setup and why this entry point was chosen
-2. Risk/reward assessment
-3. Key support/resistance levels to monitor
-Keep it concise and actionable.`;
+        const prompt = `You are Voltrix AI, a senior forex trading analyst for the Voltrix platform. Analyze this trade signal in detail:\n- Pair: ${signal.symbol}\n- Direction: ${signal.type}\n- Entry: ${signal.entry}\n- Stop Loss: ${signal.sl}\n- Take Profit: ${signal.tp}\n- Technical Pattern: ${signal.technicalReason}\n- Status: ${signal.status}\n\nProvide a detailed 3-4 sentence professional analysis covering:\n1. The technical setup and why this entry point was chosen\n2. Risk/reward assessment\n3. Key support/resistance levels to monitor\nKeep it concise and actionable.`;
 
         const result = await generateText(prompt);
         if (result) {
@@ -84,6 +111,18 @@ Keep it concise and actionable.`;
     fetchAI();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signal?.id]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar style="light" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.voltrixAccent} />
+          <Text style={styles.loadingText}>Loading signal…</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (!signal) {
     return (
@@ -105,6 +144,8 @@ Keep it concise and actionable.`;
   const riskPips = Math.abs(signal.entry - signal.sl);
   const rewardPips = Math.abs(signal.tp - signal.entry);
   const rrRatio = riskPips > 0 ? (rewardPips / riskPips).toFixed(1) : 'N/A';
+
+  const watermark = user?.email ? `VOLTRIX • ${user.email}` : user?.id ? `VOLTRIX • ${user.id.slice(0, 8)}` : 'VOLTRIX';
 
   return (
     <View style={styles.container}>
@@ -130,13 +171,23 @@ Keep it concise and actionable.`;
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Watermark */}
+        <View style={styles.watermarkWrap} pointerEvents="none">
+          <Text style={styles.watermarkText}>{watermark}</Text>
+        </View>
+
         {/* Signal Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.signalHeader}>
           <View style={styles.signalHeaderLeft}>
             <View style={styles.symbolRow}>
-              <View style={[styles.typeBadge, {
-                backgroundColor: isBuy ? Colors.neonGreenDim : Colors.crimsonRedDim,
-              }]}>
+              <View
+                style={[
+                  styles.typeBadge,
+                  {
+                    backgroundColor: isBuy ? Colors.neonGreenDim : Colors.crimsonRedDim,
+                  },
+                ]}
+              >
                 <Ionicons
                   name={isBuy ? 'trending-up' : 'trending-down'}
                   size={14}
@@ -154,10 +205,20 @@ Keep it concise and actionable.`;
           </View>
           <View style={styles.confidenceContainer}>
             <Text style={styles.confidenceLabel}>Confidence</Text>
-            <Text style={[styles.confidenceValue, {
-              color: signal.confidence >= 80 ? Colors.neonGreen : signal.confidence >= 65 ? Colors.orange : Colors.textSecondary,
-              fontFamily: Fonts.mono,
-            }]}>
+            <Text
+              style={[
+                styles.confidenceValue,
+                {
+                  color:
+                    signal.confidence >= 80
+                      ? Colors.neonGreen
+                      : signal.confidence >= 65
+                        ? Colors.orange
+                        : Colors.textSecondary,
+                  fontFamily: Fonts.mono,
+                },
+              ]}
+            >
               {signal.confidence}%
             </Text>
           </View>
@@ -266,266 +327,294 @@ const styles = StyleSheet.create({
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderDark,
+    backgroundColor: Colors.pureBlack,
   },
   headerBackBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.cardBg,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: Colors.borderDark,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
     color: Colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   headerSpacer: {
-    width: 36,
+    width: 40,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    gap: Spacing.lg,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
+  watermarkWrap: {
+    position: 'absolute',
+    right: -40,
+    top: 140,
+    transform: [{ rotate: '-18deg' }],
+    opacity: 0.14,
   },
-  errorText: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: Colors.cardBg,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-    marginTop: 8,
-  },
-  backBtnText: {
+  watermarkText: {
     color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1.6,
   },
   signalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   signalHeaderLeft: {
-    gap: 8,
+    flex: 1,
   },
   symbolRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   typeText: {
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   symbolText: {
     color: Colors.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.3,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 6,
     alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   confidenceContainer: {
-    alignItems: 'center',
-    backgroundColor: Colors.cardBg,
-    padding: 14,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
+    alignItems: 'flex-end',
   },
   confidenceLabel: {
     color: Colors.textTertiary,
-    fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   confidenceValue: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 4,
   },
   sectionLabel: {
     color: Colors.textTertiary,
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 1.2,
     marginBottom: 12,
   },
   priceGrid: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: 10,
   },
   priceBox: {
     flex: 1,
-    backgroundColor: Colors.cardBg,
-    padding: 12,
-    borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: Colors.borderDark,
-    alignItems: 'center',
+    borderRadius: BorderRadius.lg,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   priceBoxLabel: {
     color: Colors.textTertiary,
     fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   priceBoxValue: {
     color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '900',
   },
   rrRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderDark,
   },
   rrItem: {
     flex: 1,
     alignItems: 'center',
+    gap: 6,
   },
   rrDivider: {
     width: 1,
-    height: 30,
+    height: 34,
     backgroundColor: Colors.borderDark,
+    opacity: 0.8,
   },
   rrLabel: {
     color: Colors.textTertiary,
-    fontSize: 10,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 11,
+    fontWeight: '800',
   },
   rrValue: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '900',
   },
   sectionTitle: {
+    marginTop: 18,
+    marginBottom: 10,
     color: Colors.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontWeight: '900',
   },
   chartCard: {
-    backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.lg,
-    padding: 12,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
     borderColor: Colors.borderDark,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   techCard: {
-    backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.lg,
-    padding: 16,
+    marginTop: 18,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
     borderColor: Colors.borderDark,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.orange,
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   techHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   techTitle: {
     color: Colors.textPrimary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '900',
   },
   techText: {
     color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   aiCard: {
-    backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.lg,
-    padding: 16,
+    marginTop: 18,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.voltrixAccent,
-    borderLeftWidth: 3,
+    borderColor: Colors.borderDark,
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    marginBottom: 8,
   },
   aiHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.voltrixAccentDim,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: Colors.voltrixAccentDim,
     borderWidth: 1,
     borderColor: Colors.voltrixAccentGlow,
   },
   aiBadgeText: {
     color: Colors.voltrixAccent,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  aiLoading: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  aiLoadingText: {
-    color: Colors.textTertiary,
-    fontSize: 13,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   aiText: {
     color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 18,
   },
   aiPlaceholder: {
     color: Colors.textTertiary,
     fontSize: 13,
-    fontStyle: 'italic',
+  },
+  aiLoading: {
+    paddingVertical: 10,
+  },
+  aiLoadingText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    gap: 14,
+  },
+  errorText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+  },
+  backBtn: {
+    marginTop: 6,
+    paddingHorizontal: 16,
+    height: 44,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.voltrixAccent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backBtnText: {
+    color: '#000',
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

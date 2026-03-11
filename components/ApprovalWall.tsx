@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { StyleSheet, View, Text, Pressable, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,7 +12,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/theme';
+import { useAuth } from '@/lib/auth';
+
+const WHATSAPP_NUMBER = '447300088849';
 
 // Slow-pulsing ring
 function PulseRing({
@@ -127,13 +131,21 @@ interface ApprovalWallProps {
 
 export default function ApprovalWall({ screenName = 'this feature' }: ApprovalWallProps) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
+  const waLink = useMemo(() => {
+    const email = user?.email ?? '';
+    const uid = user?.id ?? '';
+    const msg = `Hi, I signed up for Voltrix and need approval. Email: ${email} UID: ${uid}`;
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+  }, [user?.email, user?.id]);
 
   return (
     <Animated.View
       entering={FadeIn.duration(600)}
       style={[
         styles.container,
-        { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 },
+        { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 90 },
       ]}
     >
       {/* Subtle grid background */}
@@ -151,10 +163,9 @@ export default function ApprovalWall({ screenName = 'this feature' }: ApprovalWa
 
         <View style={styles.textBlock}>
           <Text style={styles.statusCode}>SEC-AUTH-403</Text>
-          <Text style={styles.headlineTitle}>Awaiting{'\n'}Verification</Text>
+          <Text style={styles.headlineTitle}>Awaiting{'\n'}Approval</Text>
           <Text style={styles.subheadline}>
-            Your account is pending administrator approval. Access to {screenName} will be granted
-            once your identity is verified by the Voltrix security team.
+            Your account is pending administrator approval. Access to {screenName} will be granted once payment is confirmed.
           </Text>
         </View>
 
@@ -167,12 +178,12 @@ export default function ApprovalWall({ screenName = 'this feature' }: ApprovalWa
           <View style={styles.statusDivider} />
           <View style={styles.statusItem}>
             <View style={[styles.statusPip, { backgroundColor: '#00E676' }]} />
-            <Text style={styles.statusItemText}>Identity submitted</Text>
+            <Text style={styles.statusItemText}>Signup completed</Text>
             <Ionicons name="checkmark" size={14} color="#00E676" />
           </View>
           <View style={styles.statusItem}>
             <PendingPip />
-            <Text style={styles.statusItemText}>Admin review</Text>
+            <Text style={styles.statusItemText}>Payment / admin review</Text>
             <Text style={styles.pendingTag}>PENDING</Text>
           </View>
           <View style={styles.statusItem}>
@@ -186,9 +197,40 @@ export default function ApprovalWall({ screenName = 'this feature' }: ApprovalWa
           </View>
         </View>
 
-        <Text style={styles.footerNote}>
-          You will be automatically redirected once approved.
-        </Text>
+        <View style={styles.contactCard}>
+          <View style={styles.contactRow}>
+            <Ionicons name="logo-whatsapp" size={16} color={Colors.neonGreen} />
+            <Text style={styles.contactTitle}>Contact to activate</Text>
+          </View>
+          <Text style={styles.contactText}>Message us on WhatsApp to confirm payment and activate your account.</Text>
+
+          {user?.email ? (
+            <View style={styles.identityBox}>
+              <Text style={styles.identityLabel}>Your Email</Text>
+              <Text style={[styles.identityValue, { fontFamily: Fonts.mono }]}>{user.email}</Text>
+              <Text style={styles.identityLabel}>Your User ID</Text>
+              <Text style={[styles.identityValue, { fontFamily: Fonts.mono }]} numberOfLines={1}>
+                {user.id}
+              </Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            style={({ pressed }) => [styles.whatsAppBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.open(waLink, '_blank', 'noopener,noreferrer');
+                return;
+              }
+              void Linking.openURL(waLink);
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses" size={16} color="#000" />
+            <Text style={styles.whatsAppBtnText}>OPEN WHATSAPP</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.footerNote}>You will be automatically redirected once approved.</Text>
       </View>
     </Animated.View>
   );
@@ -208,83 +250,71 @@ function PendingPip() {
     );
   }, [blink]);
   const style = useAnimatedStyle(() => ({ opacity: blink.value }));
-  return (
-    <Animated.View
-      style={[style, styles.statusPip, { backgroundColor: '#F59E0B' }]}
-    />
-  );
+  return <Animated.View style={[style, styles.statusPip, { backgroundColor: '#F59E0B' }]} />;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.pureBlack,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
   },
   gridOverlay: {
-    position: 'absolute',
-    inset: 0,
-    opacity: 0.03,
-    backgroundColor: Colors.pureBlack,
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.35,
+    backgroundColor: 'transparent',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   securityTag: {
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(255,59,92,0.1)',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(168, 85, 247, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,59,92,0.25)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.full,
-    marginBottom: 20,
+    borderColor: 'rgba(168, 85, 247, 0.22)',
   },
   securityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.crimsonRed,
-    shadowColor: Colors.crimsonRed,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.voltrixAccent,
   },
   securityTagText: {
-    color: Colors.crimsonRed,
-    fontSize: 10,
+    color: Colors.voltrixAccent,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 2,
-    fontFamily: Fonts.mono,
+    letterSpacing: 1.2,
   },
   centerContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 28,
-    width: '100%',
+    paddingHorizontal: 18,
+    gap: 18,
   },
   iconContainer: {
-    width: 240,
-    height: 240,
     alignItems: 'center',
     justifyContent: 'center',
+    height: 260,
+    width: 260,
   },
   pulseRing: {
     position: 'absolute',
     borderWidth: 1,
   },
   lockIconBg: {
-    width: 88,
-    height: 88,
-    borderRadius: 28,
-    backgroundColor: Colors.voltrixAccentDim,
-    borderWidth: 1.5,
-    borderColor: Colors.voltrixAccentGlow,
+    width: 84,
+    height: 84,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 20,
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.28)',
   },
   textBlock: {
     alignItems: 'center',
@@ -292,33 +322,32 @@ const styles = StyleSheet.create({
   },
   statusCode: {
     color: Colors.textTertiary,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2.5,
+    fontSize: 11,
     fontFamily: Fonts.mono,
+    letterSpacing: 2,
   },
   headlineTitle: {
     color: Colors.textPrimary,
-    fontSize: 36,
-    fontWeight: '800',
-    letterSpacing: -1,
+    fontSize: 34,
+    fontWeight: '900',
     textAlign: 'center',
-    lineHeight: 42,
+    letterSpacing: -0.4,
+    lineHeight: 38,
   },
   subheadline: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 21,
-    maxWidth: 280,
-    marginTop: 4,
+    lineHeight: 18,
+    maxWidth: 330,
   },
   statusCard: {
     width: '100%',
+    maxWidth: 420,
     backgroundColor: Colors.cardBg,
-    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.borderDark,
+    borderRadius: BorderRadius.xl,
     padding: 16,
     gap: 10,
   },
@@ -329,12 +358,14 @@ const styles = StyleSheet.create({
   },
   statusCardTitle: {
     color: Colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   statusDivider: {
     height: 1,
     backgroundColor: Colors.borderDark,
+    opacity: 0.8,
   },
   statusItem: {
     flexDirection: 'row',
@@ -344,36 +375,91 @@ const styles = StyleSheet.create({
   statusPip: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-    elevation: 2,
+    borderRadius: 99,
   },
   statusItemText: {
-    flex: 1,
     color: Colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
+    flex: 1,
   },
   pendingTag: {
-    color: '#F59E0B',
-    fontSize: 9,
+    color: Colors.orange,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.2,
-    fontFamily: Fonts.mono,
-    backgroundColor: 'rgba(245,158,11,0.14)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
+    letterSpacing: 1,
   },
   lockedTag: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
+    borderRadius: 99,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  contactCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: BorderRadius.xl,
+    padding: 16,
+    gap: 10,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  contactTitle: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  contactText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  identityBox: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    borderRadius: BorderRadius.lg,
+    padding: 12,
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+  },
+  identityLabel: {
+    color: Colors.textTertiary,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  identityValue: {
+    color: Colors.textPrimary,
+    fontSize: 12,
+  },
+  whatsAppBtn: {
+    height: 50,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.neonGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  whatsAppBtnText: {
+    color: '#000',
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    fontSize: 12,
   },
   footerNote: {
     color: Colors.textTertiary,
     fontSize: 12,
     textAlign: 'center',
-    fontStyle: 'italic',
   },
 });
