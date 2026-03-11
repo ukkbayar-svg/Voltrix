@@ -3,19 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 
+const DEFAULT_SUPABASE_URL = 'https://gdomncxrobwwluoiqtbx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdkb21uY3hyb2J3d2x1b2lxdGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDMxNDksImV4cCI6MjA4Nzg3OTE0OX0.8W9gC_NGsMNuZMyROgpECkTmolGyUYOyOHBxZVjVIuI';
+
 const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-export const isSupabaseConfigured = Boolean(rawSupabaseUrl && rawSupabaseAnonKey);
 
-// Fallbacks prevent createClient from throwing during development without env vars.
-// Network calls will fail gracefully in code paths that already handle errors.
-const supabaseUrl = rawSupabaseUrl ?? 'https://placeholder.supabase.co';
-const supabaseAnonKey = rawSupabaseAnonKey ?? 'public-anon-key';
+// If env vars are missing, we connect to this project's Supabase by default.
+const supabaseUrl = rawSupabaseUrl ?? DEFAULT_SUPABASE_URL;
+const supabaseAnonKey = rawSupabaseAnonKey ?? DEFAULT_SUPABASE_ANON_KEY;
+
+export const isSupabaseConfigured = Boolean(rawSupabaseUrl && rawSupabaseAnonKey);
 
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
   console.warn(
-    'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to enable live features.'
+    'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY not set; using the built-in Supabase project for this app.'
   );
 }
 
@@ -143,42 +147,28 @@ export async function fetchAllProfiles(): Promise<DbProfile[]> {
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false });
-  if (error) {
-    // Attach Supabase error code so callers can distinguish error types
-    const enriched = new Error(error.message) as Error & { code?: string };
-    enriched.code = error.code;
-    throw enriched;
-  }
+  throwSupabase(error);
   return data ?? [];
 }
 
 // Update push token for a user profile
 export async function updatePushToken(userId: string, pushToken: string): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ push_token: pushToken })
-    .eq('id', userId);
+  const { error } = await supabase.from('profiles').update({ push_token: pushToken }).eq('id', userId);
   throwSupabase(error);
 }
 
 // Follow a signal (paper trading)
 export async function followSignal(userId: string, signalId: string, entryPrice: number): Promise<void> {
-  const { error } = await supabase
-    .from('user_signals')
-    .upsert(
-      { user_id: userId, signal_id: signalId, entry_price: entryPrice },
-      { onConflict: 'user_id,signal_id' }
-    );
+  const { error } = await supabase.from('user_signals').upsert(
+    { user_id: userId, signal_id: signalId, entry_price: entryPrice },
+    { onConflict: 'user_id,signal_id' }
+  );
   throwSupabase(error);
 }
 
 // Unfollow a signal
 export async function unfollowSignal(userId: string, signalId: string): Promise<void> {
-  const { error } = await supabase
-    .from('user_signals')
-    .delete()
-    .eq('user_id', userId)
-    .eq('signal_id', signalId);
+  const { error } = await supabase.from('user_signals').delete().eq('user_id', userId).eq('signal_id', signalId);
   throwSupabase(error);
 }
 
@@ -201,22 +191,19 @@ export async function fetchApprovedPushTokens(): Promise<string[]> {
     .eq('is_approved', true)
     .not('push_token', 'is', null);
   throwSupabase(error);
-  return (data ?? [])
-    .map((p: { push_token: string | null }) => p.push_token)
-    .filter(Boolean) as string[];
+  return (data ?? []).map((p: { push_token: string | null }) => p.push_token).filter(Boolean) as string[];
 }
 
 // Admin: set approval status — restricted to master admin session only
 export async function setUserApproval(userId: string, approved: boolean): Promise<void> {
   // Backend synchronization: verify the active authenticated session is the master admin
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (session?.user?.email !== 'ukbayar@gmail.com') {
     throw new Error('Unauthorized: Only the master admin can modify approval status.');
   }
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({ is_approved: approved })
-    .eq('id', userId);
+  const { error } = await supabase.from('profiles').update({ is_approved: approved }).eq('id', userId);
   throwSupabase(error);
 }
