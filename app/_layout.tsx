@@ -29,7 +29,8 @@ function AuthRouteGuard() {
       root === 'signup' ||
       root === 'forgot-password';
 
-    const isProtected = root === '(tabs)' || root === 'admin' || root === 'signal';
+    // Only admin route is truly protected in this app (tabs can be browsed as guest).
+    const isProtected = root === 'admin';
 
     if (!user && isProtected) {
       router.replace('/(auth)/login');

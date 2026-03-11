@@ -146,14 +146,14 @@ export default function OnboardingScreen() {
       });
     } else {
       await AsyncStorage.setItem('onboarding_complete', 'true');
-      router.replace(user ? '/(tabs)' : '/(auth)/login');
+      router.replace('/(tabs)');
     }
   };
 
   const handleSkip = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await AsyncStorage.setItem('onboarding_complete', 'true');
-    router.replace(user ? '/(tabs)' : '/(auth)/login');
+    router.replace('/(tabs)');
   };
 
   const buttonScale = useSharedValue(1);

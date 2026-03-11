@@ -11,7 +11,8 @@ export default function IndexScreen() {
   const { user } = useAuth();
 
   // Hard-coded security override: only this exact account has admin access
-  const isAdmin = user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
+  const isAdmin =
+    user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -40,13 +41,12 @@ export default function IndexScreen() {
     return <Redirect href="/admin" />;
   }
 
-  // If not logged in, route to onboarding first (optional), then login.
-  if (!user) {
-    return hasOnboarded ? <Redirect href="/(auth)/login" /> : <Redirect href="/onboarding" />;
+  // Always allow entering the app (guest browsing). Onboarding gates first-time users only.
+  if (!hasOnboarded) {
+    return <Redirect href="/onboarding" />;
   }
 
-  // Logged in: go to tabs (after onboarding)
-  return hasOnboarded ? <Redirect href="/(tabs)" /> : <Redirect href="/onboarding" />;
+  return <Redirect href="/(tabs)" />;
 }
 
 const styles = StyleSheet.create({

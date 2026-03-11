@@ -15,7 +15,7 @@ export interface ApprovalState {
 
 export function useApproval(): ApprovalState {
   const { user } = useAuth();
-  const [isApproved, setIsApproved] = useState(false);
+  const [isApproved, setIsApproved] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -24,7 +24,9 @@ export function useApproval(): ApprovalState {
   const isAdmin = email === ADMIN_EMAIL && userId === ADMIN_UID;
 
   const loadStatus = useCallback(async () => {
+    // Guest users can browse without approval.
     if (!userId || !email) {
+      setIsApproved(true);
       setIsLoading(false);
       return;
     }
@@ -37,9 +39,7 @@ export function useApproval(): ApprovalState {
     }
 
     try {
-      // Ensure profile row exists
       await upsertProfile(userId, email);
-      // Fetch status
       const approved = await fetchApprovalStatus(userId);
       setIsApproved(approved);
     } catch {
@@ -49,7 +49,6 @@ export function useApproval(): ApprovalState {
     }
   }, [userId, email, isAdmin]);
 
-  // Real-time subscription to profile changes
   const subscribeToProfile = useCallback(() => {
     if (!userId || isAdmin) return;
 
