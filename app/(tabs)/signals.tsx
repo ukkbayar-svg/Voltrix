@@ -236,7 +236,7 @@ export default function SignalsScreen() {
   // Subscribe to real-time signal changes
   const subscribeToSignals = useCallback(() => {
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      void channelRef.current.unsubscribe().catch(() => {});
     }
 
     const channel = supabase
@@ -342,7 +342,7 @@ export default function SignalsScreen() {
 
     return () => {
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        void channelRef.current.unsubscribe().catch(() => {});
       }
     };
   }, [fetchSignals, seedSignals, generateAIInsights, subscribeToSignals, loadFollowedSignals]);

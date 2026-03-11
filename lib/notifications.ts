@@ -109,6 +109,6 @@ export function subscribeToSignalsForNotifications(
     .subscribe();
 
   return () => {
-    channel.unsubscribe();
+    void channel.unsubscribe().catch(() => {});
   };
 }

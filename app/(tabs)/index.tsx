@@ -286,7 +286,7 @@ export default function CommandScreen() {
   // Subscribe to real-time account data updates
   const subscribeToAccountData = useCallback((userId: string) => {
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      void channelRef.current.unsubscribe().catch(() => {});
     }
 
     const channel = supabase
@@ -400,7 +400,7 @@ export default function CommandScreen() {
 
     return () => {
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        void channelRef.current.unsubscribe().catch(() => {});
       }
     };
   }, [user?.id, fetchAccountData, fetchPositions, initializeAccountData, initializePositions, subscribeToAccountData]);

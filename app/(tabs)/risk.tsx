@@ -265,7 +265,7 @@ export default function RiskScreen() {
   // Subscribe to real-time account_data changes
   const subscribeToAccountData = useCallback((userId: string) => {
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      void channelRef.current.unsubscribe().catch(() => {});
     }
 
     const channel = supabase
@@ -379,7 +379,7 @@ export default function RiskScreen() {
 
     return () => {
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        void channelRef.current.unsubscribe().catch(() => {});
       }
     };
   }, [user?.id, fetchAccountData, fetchRiskAlerts, seedRiskAlerts, subscribeToAccountData]);

@@ -292,7 +292,7 @@ export default function AdminScreen() {
   // Real-time subscription to profile changes
   const subscribeToProfiles = useCallback(() => {
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      void channelRef.current.unsubscribe().catch(() => {});
     }
     const channel = supabase
       .channel('admin-profiles-realtime')
@@ -311,7 +311,9 @@ export default function AdminScreen() {
     loadProfiles();
     subscribeToProfiles();
     return () => {
-      channelRef.current?.unsubscribe();
+      if (channelRef.current) {
+        void channelRef.current.unsubscribe().catch(() => {});
+      }
     };
   }, [loadProfiles, subscribeToProfiles]);
 

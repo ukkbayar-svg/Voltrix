@@ -53,7 +53,7 @@ export function useApproval(): ApprovalState {
     if (!userId || isAdmin) return;
 
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      void channelRef.current.unsubscribe().catch(() => {});
     }
 
     const channel = supabase
@@ -82,7 +82,7 @@ export function useApproval(): ApprovalState {
 
     return () => {
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        void channelRef.current.unsubscribe().catch(() => {});
       }
     };
   }, [loadStatus, subscribeToProfile]);
