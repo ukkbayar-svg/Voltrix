@@ -21,8 +21,13 @@ function AuthRouteGuard() {
     if (!isInitialized) return;
 
     const root = segments[0];
-    const inAuth = root === '(auth)' || root === 'auth';
-    const inOnboarding = root === 'onboarding';
+
+    const inAuth =
+      root === '(auth)' ||
+      root === 'auth' ||
+      root === 'login' ||
+      root === 'signup' ||
+      root === 'forgot-password';
 
     const isProtected = root === '(tabs)' || root === 'admin' || root === 'signal';
 
@@ -34,8 +39,6 @@ function AuthRouteGuard() {
     if (user && inAuth) {
       router.replace('/');
     }
-
-    // Allow onboarding and index for both states.
   }, [segments, router, user, isInitialized]);
 
   return null;
