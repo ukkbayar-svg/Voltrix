@@ -111,7 +111,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
   const pulseAnim = useSharedValue(1);
 
   React.useEffect(() => {
@@ -139,7 +139,11 @@ export default function OnboardingScreen() {
   const handleNext = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+      // scrollToIndex can fail on web without measurements; scrollToOffset is more reliable.
+      flatListRef.current?.scrollToOffset({
+        offset: (currentIndex + 1) * SCREEN_WIDTH,
+        animated: true,
+      });
     } else {
       await AsyncStorage.setItem('onboarding_complete', 'true');
       router.replace(user ? '/(tabs)' : '/(auth)/login');
@@ -218,6 +222,15 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onMomentumScrollEnd={(e) => {
+          const next = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          if (!Number.isNaN(next)) setCurrentIndex(next);
+        }}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
         bounces={false}
       />
 

@@ -17,9 +17,6 @@ importers:
       '@fastshot/ai':
         specifier: ^1.0.7
         version: 1.0.8(expo@54.0.33)(react-native@0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      '@fastshot/auth':
-        specifier: ^1.1.0
-        version: 1.1.0(@supabase/supabase-js@2.99.0)(expo-linking@8.0.11)(expo-router@6.0.23)(expo-web-browser@15.0.10(expo@54.0.33)(react-native@0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0)))
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react@19.1.17)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1096,14 +1093,6 @@ packages:
     peerDependencies:
       react: ^19.0.0
       react-native: '>=0.70.0'
-
-  '@fastshot/auth@1.1.0':
-    resolution: {integrity: sha512-NGAWHh0S18FlTltWC6PVpHagP8FRhMdoBmY81jQTmDds4QWfkICINtkYd/pubvv8yl4zNz2mV9r5Wd4ziuoH8g==}
-    peerDependencies:
-      '@supabase/supabase-js': ^2.0.0
-      expo-linking: ^8.0.0
-      expo-router: ^6.0.21
-      expo-web-browser: ^15.0.0
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -6326,14 +6315,6 @@ snapshots:
       react-native: 0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0)
     transitivePeerDependencies:
       - expo
-
-  '@fastshot/auth@1.1.0(@supabase/supabase-js@2.99.0)(expo-linking@8.0.11)(expo-router@6.0.23)(expo-web-browser@15.0.10(expo@54.0.33)(react-native@0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0)))':
-    dependencies:
-      '@supabase/supabase-js': 2.99.0
-      babel-plugin-transform-inline-environment-variables: 0.4.4
-      expo-linking: 8.0.11(expo@54.0.33)(react-native@0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      expo-router: 6.0.23(4314494604ef5b5afdac634a694b185c)
-      expo-web-browser: 15.0.10(expo@54.0.33)(react-native@0.77.0(@babel/core@7.29.0)(@babel/preset-env@7.29.0(@babel/core@7.29.0))(@types/react@19.1.17)(react@19.1.0))
 
   '@humanfs/core@0.19.1': {}
 
