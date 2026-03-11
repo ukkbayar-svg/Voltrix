@@ -87,6 +87,38 @@ export default function RootLayout() {
     }
   }, [loaded, error]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      // Prevent the red error overlay from showing "Error [object Object]".
+      event.preventDefault();
+
+      const reason = event.reason;
+      let message = 'Unhandled promise rejection';
+
+      if (reason instanceof Error) {
+        message = reason.message;
+      } else if (typeof reason === 'string') {
+        message = reason;
+      } else {
+        try {
+          message = JSON.stringify(reason);
+        } catch {
+          message = String(reason);
+        }
+      }
+
+      // eslint-disable-next-line no-console
+      console.error('Unhandled promise rejection:', message, reason);
+    };
+
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
+
   if (!loaded && !error) {
     return null;
   }

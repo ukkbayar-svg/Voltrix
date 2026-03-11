@@ -155,7 +155,10 @@ export default function SignalsScreen() {
               .from('signals')
               .update({ ai_insight: insight })
               .eq('id', signal.id)
-              .then(() => {});
+              .then(
+                () => {},
+                () => {}
+              );
           }
         }
       }
@@ -268,7 +271,10 @@ export default function SignalsScreen() {
                 .from('signals')
                 .update({ ai_insight: insight })
                 .eq('id', newSignal.id)
-                .then(() => {});
+                .then(
+                  () => {},
+                  () => {}
+                );
             }
           }
         }
