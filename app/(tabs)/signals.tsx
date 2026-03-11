@@ -177,7 +177,11 @@ export default function SignalsScreen() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        const e = new Error(error.message || 'Failed to fetch signals') as Error & { code?: string };
+        e.code = (error as { code?: string }).code;
+        throw e;
+      }
 
       if (data && data.length > 0) {
         const converted = data.map(dbToSignal);
