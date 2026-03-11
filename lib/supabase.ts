@@ -19,6 +19,14 @@ if (!isSupabaseConfigured) {
   );
 }
 
+// Helper to throw proper Error instances (with code) instead of plain objects
+function throwSupabase(error: { message?: string; code?: string } | null) {
+  if (!error) return;
+  const e = new Error(error.message || 'Supabase error') as Error & { code?: string };
+  e.code = error.code;
+  throw e;
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
@@ -112,18 +120,20 @@ export interface DbUserSignal {
 
 // Ensure a profile row exists for the current user
 export async function upsertProfile(userId: string, email: string): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .upsert({ id: userId, email, is_approved: false }, { onConflict: 'id', ignoreDuplicates: true });
+  throwSupabase(error);
 }
 
 // Fetch current user's approval status
 export async function fetchApprovalStatus(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('is_approved')
     .eq('id', userId)
     .single();
+  throwSupabase(error);
   return data?.is_approved ?? false;
 }
 
@@ -144,10 +154,11 @@ export async function fetchAllProfiles(): Promise<DbProfile[]> {
 
 // Update push token for a user profile
 export async function updatePushToken(userId: string, pushToken: string): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ push_token: pushToken })
     .eq('id', userId);
+  throwSupabase(error);
 }
 
 // Follow a signal (paper trading)
@@ -158,7 +169,7 @@ export async function followSignal(userId: string, signalId: string, entryPrice:
       { user_id: userId, signal_id: signalId, entry_price: entryPrice },
       { onConflict: 'user_id,signal_id' }
     );
-  if (error) throw error;
+  throwSupabase(error);
 }
 
 // Unfollow a signal
@@ -168,7 +179,7 @@ export async function unfollowSignal(userId: string, signalId: string): Promise<
     .delete()
     .eq('user_id', userId)
     .eq('signal_id', signalId);
-  if (error) throw error;
+  throwSupabase(error);
 }
 
 // Fetch all signals followed by user
@@ -178,18 +189,21 @@ export async function fetchUserSignals(userId: string): Promise<DbUserSignal[]> 
     .select('*')
     .eq('user_id', userId)
     .order('followed_at', { ascending: false });
-  if (error) throw error;
+  throwSupabase(error);
   return data ?? [];
 }
 
 // Fetch approved user push tokens (for sending notifications)
 export async function fetchApprovedPushTokens(): Promise<string[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('push_token')
     .eq('is_approved', true)
     .not('push_token', 'is', null);
-  return (data ?? []).map((p: { push_token: string | null }) => p.push_token).filter(Boolean) as string[];
+  throwSupabase(error);
+  return (data ?? [])
+    .map((p: { push_token: string | null }) => p.push_token)
+    .filter(Boolean) as string[];
 }
 
 // Admin: set approval status — restricted to master admin session only
@@ -204,5 +218,5 @@ export async function setUserApproval(userId: string, approved: boolean): Promis
     .from('profiles')
     .update({ is_approved: approved })
     .eq('id', userId);
-  if (error) throw error;
+  throwSupabase(error);
 }
