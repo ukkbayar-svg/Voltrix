@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as Linking from 'expo-linking';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -35,7 +36,7 @@ export default function ForgotPasswordScreen() {
     const redirectTo =
       Platform.OS === 'web'
         ? `${window.location.origin}/auth/reset`
-        : 'fastshot://auth/reset';
+        : Linking.createURL('auth/reset', { scheme: 'fastshot' });
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo,

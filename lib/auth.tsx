@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -18,12 +19,18 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function getEmailRedirectTo(path: string) {
+function getRedirectUrl(path: string) {
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+  // On web, we want a normal https/http URL.
   if (Platform.OS === 'web') {
-    return `${window.location.origin}${path}`;
+    return `${window.location.origin}/${cleanPath}`;
   }
-  // Matches app.json scheme: fastshot
-  return `fastshot:/${path}`;
+
+  // On native, let Expo generate the correct deep link.
+  // - In Expo Go: exp://.../--/auth/callback
+  // - In standalone builds: fastshot://auth/callback (scheme from app.json)
+  return Linking.createURL(cleanPath, { scheme: 'fastshot' });
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -84,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setPendingEmailVerification(false);
 
-    const emailRedirectTo = getEmailRedirectTo('/auth/callback');
+    const emailRedirectTo = getRedirectUrl('/auth/callback');
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
