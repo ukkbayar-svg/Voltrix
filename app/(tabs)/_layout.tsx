@@ -12,7 +12,7 @@ export default function TabLayout() {
   const { user } = useAuth();
 
   // Hard-coded security override: Admin Panel entry point only visible to master admin
-  const isAdmin = user?.email === 'ukbayar@gmail.com';
+  const isAdmin = user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
 
   return (
     <Tabs

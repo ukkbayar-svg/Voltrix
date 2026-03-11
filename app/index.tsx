@@ -10,8 +10,8 @@ export default function IndexScreen() {
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const { user } = useAuth();
 
-  // Hard-coded security override: only this email has admin access
-  const isAdmin = user?.email === 'ukbayar@gmail.com';
+  // Hard-coded security override: only this exact account has admin access
+  const isAdmin = user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
 
   useEffect(() => {
     const checkOnboarding = async () => {

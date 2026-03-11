@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase, upsertProfile, fetchApprovalStatus } from './supabase';
 
 export const ADMIN_EMAIL = 'ukbayar@gmail.com';
+export const ADMIN_UID = '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
 
 export interface ApprovalState {
   isApproved: boolean;
@@ -20,7 +21,7 @@ export function useApproval(): ApprovalState {
 
   const email = user?.email ?? null;
   const userId = user?.id ?? null;
-  const isAdmin = email === ADMIN_EMAIL;
+  const isAdmin = email === ADMIN_EMAIL && userId === ADMIN_UID;
 
   const loadStatus = useCallback(async () => {
     if (!userId || !email) {

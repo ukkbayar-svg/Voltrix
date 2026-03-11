@@ -51,11 +51,11 @@ CREATE POLICY "profiles: users can update own"
   USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY "profiles: master admin can select all"
   ON public.profiles FOR SELECT TO authenticated
-  USING (auth.email() = 'ukbayar@gmail.com');
+  USING (auth.uid() = '40e32eee-1bee-4033-9ce1-f3b29d112d6e'::uuid);
 CREATE POLICY "profiles: master admin can update all"
   ON public.profiles FOR UPDATE TO authenticated
-  USING (auth.email() = 'ukbayar@gmail.com')
-  WITH CHECK (auth.email() = 'ukbayar@gmail.com');`;
+  USING (auth.uid() = '40e32eee-1bee-4033-9ce1-f3b29d112d6e'::uuid)
+  WITH CHECK (auth.uid() = '40e32eee-1bee-4033-9ce1-f3b29d112d6e'::uuid);`;
 
 // Status definitions
 const STATUS_CONFIG = {
@@ -258,8 +258,8 @@ export default function AdminScreen() {
   const [sqlCopied, setSqlCopied] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Hard-coded security override: only this exact email is the master admin
-  const isAdmin = user?.email === 'ukbayar@gmail.com';
+  // Hard-coded security override: only this exact account is the master admin
+  const isAdmin = user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
 
   // Route protection: instantly redirect any non-admin to Command screen
   useEffect(() => {

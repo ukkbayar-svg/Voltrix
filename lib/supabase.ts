@@ -198,7 +198,10 @@ export async function setUserApproval(userId: string, approved: boolean): Promis
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (session?.user?.email !== 'ukbayar@gmail.com') {
+  if (
+    session?.user?.email !== 'ukbayar@gmail.com' ||
+    session?.user?.id !== '40e32eee-1bee-4033-9ce1-f3b29d112d6e'
+  ) {
     throw new Error('Unauthorized: Only the master admin can modify approval status.');
   }
 
