@@ -7,19 +7,17 @@ const DEFAULT_SUPABASE_URL = 'https://gdomncxrobwwluoiqtbx.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdkb21uY3hyb2J3d2x1b2lxdGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDMxNDksImV4cCI6MjA4Nzg3OTE0OX0.8W9gC_NGsMNuZMyROgpECkTmolGyUYOyOHBxZVjVIuI';
 
-const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? DEFAULT_SUPABASE_URL;
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? DEFAULT_SUPABASE_ANON_KEY;
 
-// If env vars are missing, we connect to this project's Supabase by default.
-const supabaseUrl = rawSupabaseUrl ?? DEFAULT_SUPABASE_URL;
-const supabaseAnonKey = rawSupabaseAnonKey ?? DEFAULT_SUPABASE_ANON_KEY;
-
-export const isSupabaseConfigured = Boolean(rawSupabaseUrl && rawSupabaseAnonKey);
+export const isSupabaseConfigured = Boolean(
+  process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+);
 
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
   console.warn(
-    'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY not set; using the built-in Supabase project for this app.'
+    'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY not set; falling back to defaults. Set them in .env (local) or Vercel env vars (production).'
   );
 }
 
@@ -31,7 +29,7 @@ function throwSupabase(error: { message?: string; code?: string } | null) {
   throw e;
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,

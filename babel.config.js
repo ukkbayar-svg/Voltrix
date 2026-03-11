@@ -26,6 +26,8 @@ module.exports = function (api) {
             {
               include: [
                 'EXPO_PUBLIC_PROJECT_ID',
+                'EXPO_PUBLIC_SUPABASE_URL',
+                'EXPO_PUBLIC_SUPABASE_ANON_KEY',
                 'EXPO_PUBLIC_NEWELL_API_URL',
                 'EXPO_PUBLIC_AUTH_BROKER_URL',
               ],
