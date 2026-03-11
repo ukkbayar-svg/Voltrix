@@ -11,26 +11,47 @@ import {
   Pressable,
 } from 'react-native';
 import { Link } from 'expo-router';
-import { useAuth } from '@fastshot/auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
-  const { resetPassword, isLoading, error, clearError, pendingPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
   const [focused, setFocused] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
   const handleReset = async () => {
     if (!email.trim()) return;
-    clearError?.();
-    await resetPassword(email.trim());
+
+    setError(null);
+    setIsLoading(true);
+
+    const redirectTo =
+      Platform.OS === 'web'
+        ? `${window.location.origin}/auth/reset`
+        : 'fastshot://auth/reset';
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+
+    setIsLoading(false);
+
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+
+    setSent(true);
   };
 
-  if (pendingPasswordReset) {
+  if (sent) {
     return (
       <View style={[styles.container, styles.center, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
@@ -82,7 +103,7 @@ export default function ForgotPasswordScreen() {
             {error && (
               <View style={styles.errorBanner}>
                 <Ionicons name="alert-circle" size={16} color={Colors.crimsonRed} />
-                <Text style={styles.errorText}>{error.message}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
@@ -97,7 +118,10 @@ export default function ForgotPasswordScreen() {
                 placeholder="Your vault email"
                 placeholderTextColor={Colors.textTertiary}
                 value={email}
-                onChangeText={(t) => { setEmail(t); clearError?.(); }}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setError(null);
+                }}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 returnKeyType="send"
@@ -258,7 +282,7 @@ const styles = StyleSheet.create({
   successIcon: {
     width: 90,
     height: 90,
-    borderRadius: 22,
+    borderRadius: 24,
     backgroundColor: Colors.voltrixAccentDim,
     borderWidth: 1.5,
     borderColor: Colors.voltrixAccentGlow,
@@ -274,20 +298,19 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
-    lineHeight: 21,
+    lineHeight: 20,
   },
   returnBtn: {
-    paddingHorizontal: 24,
+    backgroundColor: Colors.voltrixAccent,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: Colors.voltrixAccentDim,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
+    borderRadius: BorderRadius.lg,
     marginTop: 8,
   },
   returnBtnText: {
-    color: Colors.voltrixAccent,
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#000',
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    fontFamily: Fonts.mono,
   },
 });
