@@ -3,8 +3,21 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+export const isSupabaseConfigured = Boolean(rawSupabaseUrl && rawSupabaseAnonKey);
+
+// Fallbacks prevent createClient from throwing during development without env vars.
+// Network calls will fail gracefully in code paths that already handle errors.
+const supabaseUrl = rawSupabaseUrl ?? 'https://placeholder.supabase.co';
+const supabaseAnonKey = rawSupabaseAnonKey ?? 'public-anon-key';
+
+if (!isSupabaseConfigured) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to enable live features.'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
