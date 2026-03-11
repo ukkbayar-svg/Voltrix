@@ -106,6 +106,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="bot"
+        options={{
+          title: 'Bot',
+          tabBarIcon: ({ focused, color }) => (
+            <View style={focused ? styles.activeIconBg : undefined}>
+              <Ionicons name={focused ? 'hardware-chip' : 'hardware-chip-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="charts"
         options={{
           title: 'Charts',

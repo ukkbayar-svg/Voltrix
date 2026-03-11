@@ -120,6 +120,62 @@ export interface DbUserSignal {
   followed_at: string;
 }
 
+export interface DbBotPublicStats {
+  id: string;
+  total_return: number;
+  win_rate: number;
+  max_drawdown: number;
+  profit_factor: number;
+  equity_curve: number[];
+  updated_at: string;
+}
+
+export async function fetchBotPublicStats(): Promise<DbBotPublicStats | null> {
+  const { data, error } = await supabase
+    .from('bot_public_stats')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwSupabase(error);
+  if (!data) return null;
+
+  const raw = data as unknown as {
+    id: string;
+    total_return: unknown;
+    win_rate: unknown;
+    max_drawdown: unknown;
+    profit_factor: unknown;
+    equity_curve: unknown;
+    updated_at: string;
+  };
+
+  return {
+    id: raw.id,
+    total_return: Number(raw.total_return ?? 0),
+    win_rate: Number(raw.win_rate ?? 0),
+    max_drawdown: Number(raw.max_drawdown ?? 0),
+    profit_factor: Number(raw.profit_factor ?? 0),
+    equity_curve: Array.isArray(raw.equity_curve) ? raw.equity_curve.map(Number) : [],
+    updated_at: raw.updated_at,
+  };
+}
+
+export async function updateBotPublicStats(
+  patch: Pick<DbBotPublicStats, 'total_return' | 'win_rate' | 'max_drawdown' | 'profit_factor' | 'equity_curve'>
+): Promise<void> {
+  // Update the newest row (single-row table in practice)
+  const current = await fetchBotPublicStats();
+  if (!current) {
+    const { error } = await supabase.from('bot_public_stats').insert(patch);
+    throwSupabase(error);
+    return;
+  }
+
+  const { error } = await supabase.from('bot_public_stats').update(patch).eq('id', current.id);
+  throwSupabase(error);
+}
+
 // Ensure a profile row exists for the current user
 export async function upsertProfile(userId: string, email: string): Promise<void> {
   const { error } = await supabase

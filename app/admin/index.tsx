@@ -396,12 +396,8 @@ export default function AdminScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 120 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -412,22 +408,29 @@ export default function AdminScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-          <View style={styles.headerLeft}>
+          <View>
             <View style={styles.brandRow}>
-              <View style={styles.voltrixHex}>
-                <Ionicons name="shield" size={14} color={Colors.voltrixAccent} />
-              </View>
-              <Text style={styles.brandTag}>VOLTRIX ADMIN</Text>
-              <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>COMMAND HQ</Text>
-              </View>
+              <View style={styles.voltrixDot} />
+              <Text style={styles.brandTag}>VOLTRIX</Text>
             </View>
-            <Text style={styles.title}>User Management</Text>
-            <Text style={styles.subtitle}>Invitation-Only Access Control</Text>
+            <Text style={styles.title}>Admin</Text>
+            <Text style={styles.subtitle}>User approvals & system control</Text>
           </View>
-          <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={18} color={Colors.textTertiary} />
-          </Pressable>
+
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.headerActionBtn}
+              onPress={() => router.push('/admin/bot')}
+            >
+              <Ionicons name="hardware-chip" size={16} color={Colors.voltrixAccent} />
+              <Text style={styles.headerActionText}>Bot</Text>
+            </Pressable>
+
+            <Pressable style={styles.headerActionBtn} onPress={() => signOut()}>
+              <Ionicons name="log-out" size={16} color={Colors.textSecondary} />
+              <Text style={styles.headerActionText}>Exit</Text>
+            </Pressable>
+          </View>
         </Animated.View>
 
         {/* Admin identity chip */}
@@ -559,7 +562,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.pureBlack,
   },
-  scroll: {
+  scrollView: {
     flex: 1,
   },
   content: {
@@ -581,7 +584,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
   },
-  voltrixHex: {
+  voltrixDot: {
     width: 26,
     height: 26,
     borderRadius: 8,
@@ -597,21 +600,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 2,
   },
-  adminBadge: {
-    backgroundColor: 'rgba(168,85,247,0.18)',
-    borderWidth: 1,
-    borderColor: Colors.voltrixAccentGlow,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  adminBadgeText: {
-    color: Colors.voltrixAccentBright,
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    fontFamily: Fonts.mono,
-  },
   title: {
     color: Colors.textPrimary,
     fontSize: 28,
@@ -622,6 +610,27 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontSize: 13,
     marginTop: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  headerActionText: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: Fonts.mono,
   },
   signOutBtn: {
     width: 40,
