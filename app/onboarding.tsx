@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { Colors, BorderRadius } from '@/constants/theme';
+import { useAuth } from '@/lib/auth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -108,6 +109,7 @@ function GaugeIcon({ color, size }: { color: string; size: number }) {
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const pulseAnim = useSharedValue(1);
@@ -140,14 +142,14 @@ export default function OnboardingScreen() {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
     } else {
       await AsyncStorage.setItem('onboarding_complete', 'true');
-      router.replace('/(tabs)');
+      router.replace(user ? '/(tabs)' : '/(auth)/login');
     }
   };
 
   const handleSkip = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await AsyncStorage.setItem('onboarding_complete', 'true');
-    router.replace('/(tabs)');
+    router.replace(user ? '/(tabs)' : '/(auth)/login');
   };
 
   const buttonScale = useSharedValue(1);

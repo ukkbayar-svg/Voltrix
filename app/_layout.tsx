@@ -1,16 +1,45 @@
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { AuthProvider, useAuth } from '@fastshot/auth';
 import { supabase } from '@/lib/supabase';
+import { AuthProvider, useAuth } from '@/lib/auth';
 import { useBiometricAuth } from '@/lib/useBiometricAuth';
 import BiometricScreen from '@/components/BiometricScreen';
 import { registerForPushNotifications, subscribeToSignalsForNotifications } from '@/lib/notifications';
 import { useApproval } from '@/lib/useApproval';
 
 SplashScreen.preventAutoHideAsync();
+
+function AuthRouteGuard() {
+  const router = useRouter();
+  const segments = useSegments();
+  const { user, isInitialized } = useAuth();
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const root = segments[0];
+    const inAuth = root === '(auth)' || root === 'auth';
+    const inOnboarding = root === 'onboarding';
+
+    const isProtected = root === '(tabs)' || root === 'admin' || root === 'signal';
+
+    if (!user && isProtected) {
+      router.replace('/(auth)/login');
+      return;
+    }
+
+    if (user && inAuth) {
+      router.replace('/');
+    }
+
+    // Allow onboarding and index for both states.
+  }, [segments, router, user, isInitialized]);
+
+  return null;
+}
 
 function AppWithBiometric() {
   const { isAuthenticated, isAuthenticating, isSupported, error, authenticate } = useBiometricAuth();
@@ -34,6 +63,7 @@ function AppWithBiometric() {
 
   return (
     <>
+      <AuthRouteGuard />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -62,9 +92,7 @@ function AppWithBiometric() {
           }}
         />
       </Stack>
-      {/* Render BiometricScreen as an overlay so the Stack (and its
-          TextInputs) stays mounted. This prevents the keyboard from
-          being dismissed when biometric state changes. */}
+      {/* Render BiometricScreen as an overlay so the Stack stays mounted. */}
       {isSupported && !isAuthenticated && (
         <BiometricScreen
           onAuthenticate={authenticate}
@@ -77,15 +105,15 @@ function AppWithBiometric() {
 }
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  const [loaded, fontError] = useFonts({
     'SpaceMono-Regular': require('@/assets/fonts/SpaceMono-Regular.ttf'),
   });
 
   useEffect(() => {
-    if (loaded || error) {
+    if (loaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [loaded, fontError]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -119,20 +147,12 @@ export default function RootLayout() {
     };
   }, []);
 
-  if (!loaded && !error) {
+  if (!loaded && !fontError) {
     return null;
   }
 
   return (
-    <AuthProvider
-      supabaseClient={supabase}
-      routes={{
-        login: '/(auth)/login',
-        afterLogin: '/(tabs)',
-        protected: ['tabs', 'app', 'admin'],
-        guest: ['auth'],
-      }}
-    >
+    <AuthProvider>
       <StatusBar style="light" />
       <AppWithBiometric />
     </AuthProvider>

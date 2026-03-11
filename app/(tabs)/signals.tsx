@@ -21,7 +21,7 @@ import SignalCard from '@/components/SignalCard';
 import { supabase, DbSignal, followSignal, unfollowSignal, fetchUserSignals } from '@/lib/supabase';
 import { useApproval } from '@/lib/useApproval';
 import ApprovalWall from '@/components/ApprovalWall';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 
 type FilterType = 'all' | 'active' | 'hit_tp' | 'hit_sl' | 'pending';
 

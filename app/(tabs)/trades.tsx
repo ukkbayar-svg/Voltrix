@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { supabase, DbUserSignal, DbSignal, fetchUserSignals, unfollowSignal } from '@/lib/supabase';
 import { useApproval } from '@/lib/useApproval';

@@ -24,7 +24,7 @@ import Animated, {
   withSequence,
   interpolate,
 } from 'react-native-reanimated';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import { supabase, DbProfile, fetchAllProfiles, setUserApproval } from '@/lib/supabase';

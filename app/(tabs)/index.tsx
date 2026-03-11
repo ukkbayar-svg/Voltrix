@@ -27,7 +27,7 @@ import StatChip from '@/components/StatChip';
 import SparklineChart from '@/components/SparklineChart';
 import PulseBackground from '@/components/PulseBackground';
 import { supabase, DbAccountData, DbPosition } from '@/lib/supabase';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 import { useApproval } from '@/lib/useApproval';
 import ApprovalWall from '@/components/ApprovalWall';
 

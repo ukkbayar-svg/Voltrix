@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 import { supabase, upsertProfile, fetchApprovalStatus } from './supabase';
 
 export const ADMIN_EMAIL = 'ukbayar@gmail.com';

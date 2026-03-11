@@ -16,12 +16,21 @@ module.exports = function (api) {
           extensions: ['.ts', '.tsx', '.js', '.json'],
         },
       ],
+      [
+        'transform-inline-environment-variables',
+        {
+          include: [
+            'EXPO_PUBLIC_PROJECT_ID',
+            'EXPO_PUBLIC_SUPABASE_URL',
+            'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+          ],
+        },
+      ],
     ],
     overrides: [
       {
-        // Include @fastshot/* packages for env var inlining
-        // babel-preset-expo skips node_modules, so we need this override
-        include: /node_modules\/@fastshot\/(ai|auth)/,
+        // Inline env vars inside @fastshot/ai (node_modules is skipped by default)
+        include: /node_modules\/@fastshot\/ai/,
         plugins: [
           [
             'transform-inline-environment-variables',
@@ -30,8 +39,6 @@ module.exports = function (api) {
                 'EXPO_PUBLIC_PROJECT_ID',
                 'EXPO_PUBLIC_SUPABASE_URL',
                 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
-                'EXPO_PUBLIC_NEWELL_API_URL',
-                'EXPO_PUBLIC_AUTH_BROKER_URL',
               ],
             },
           ],

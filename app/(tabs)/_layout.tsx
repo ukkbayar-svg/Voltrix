@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 import { Colors } from '@/constants/theme';
 
 export default function TabLayout() {
@@ -121,7 +121,6 @@ export default function TabLayout() {
         name="admin"
         options={{
           title: 'Admin',
-          // Conditional block: {isAdmin && <AdminTab />} — non-admins get href: null (hidden)
           href: isAdmin ? undefined : null,
           tabBarIcon: ({ focused, color }) => (
             <View style={focused ? styles.activeIconBg : undefined}>

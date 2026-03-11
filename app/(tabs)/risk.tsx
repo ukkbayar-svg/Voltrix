@@ -23,7 +23,7 @@ import { mockAccount, AccountData } from '@/constants/mockData';
 import GlassContainer from '@/components/GlassContainer';
 import CircularGauge from '@/components/CircularGauge';
 import { supabase, DbAccountData, DbRiskAlert } from '@/lib/supabase';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 
 interface RiskAlertItem {
   id: string;

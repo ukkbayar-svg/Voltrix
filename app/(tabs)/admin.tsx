@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
-import { useAuth } from '@fastshot/auth';
+import { useAuth } from '@/lib/auth';
 
 export default function AdminTabRedirect() {
   const { user } = useAuth();
