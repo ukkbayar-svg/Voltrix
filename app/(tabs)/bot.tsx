@@ -1,13 +1,26 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { StyleSheet, View, Text, ScrollView, RefreshControl, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { Colors, Fonts, BorderRadius, Spacing } from '@/constants/theme';
 import GlassContainer from '@/components/GlassContainer';
 import LineChart from '@/components/LineChart';
-import { DbBotPublicStats, fetchBotPublicStats } from '@/lib/supabase';
+import { DbBotPublicStats, fetchBotPublicStats, supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
+
+type CTraderConnection = {
+  user_id: string;
+  scope: string;
+  expires_at: string | null;
+  connected_at: string;
+  updated_at: string;
+};
+
+const CTRADER_CLIENT_ID = '22613_FRBTa13cBKlKsRMDLnKP6fYcp9qffA13eo8GdakD7LkAuBA3AL';
 
 function formatPct(value: number) {
   const sign = value > 0 ? '+' : '';
@@ -46,16 +59,21 @@ const FALLBACK_CURVE = Array.from({ length: 40 }).map((_, i) => 10000 + i * 60 +
 
 export default function BotScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
   const [stats, setStats] = useState<DbBotPublicStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isLive, setIsLive] = useState(false);
+
+  const [conn, setConn] = useState<CTraderConnection | null>(null);
+  const [connLoading, setConnLoading] = useState(false);
 
   const curve = useMemo(() => {
     const raw = stats?.equity_curve ?? [];
     return raw.length >= 10 ? raw : FALLBACK_CURVE;
   }, [stats]);
 
-  const load = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const data = await fetchBotPublicStats();
       setStats(data);
@@ -64,16 +82,71 @@ export default function BotScreen() {
       setStats(null);
       setIsLive(false);
     }
-  };
+  }, []);
+
+  const loadConnection = useCallback(async () => {
+    if (!user?.id) {
+      setConn(null);
+      return;
+    }
+
+    setConnLoading(true);
+    const { data } = await supabase
+      .from('ctrader_connections')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    setConn(data as CTraderConnection | null);
+    setConnLoading(false);
+  }, [user?.id]);
 
   useEffect(() => {
-    load();
-  }, []);
+    loadStats();
+    loadConnection();
+  }, [loadStats, loadConnection]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await Promise.all([loadStats(), loadConnection()]);
     setRefreshing(false);
+  };
+
+  const redirectUri = useMemo(() => {
+    if (Platform.OS === 'web') return `${window.location.origin}/auth/ctrader`;
+    return Linking.createURL('auth/ctrader', { scheme: 'fastshot' });
+  }, []);
+
+  const startConnect = async () => {
+    if (!user) return;
+
+    const authUrl =
+      `https://id.ctrader.com/my/settings/openapi/grantingaccess/?` +
+      `client_id=${encodeURIComponent(CTRADER_CLIENT_ID)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=trading&product=web`;
+
+    if (Platform.OS === 'web') {
+      window.location.href = authUrl;
+      return;
+    }
+
+    await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+  };
+
+  const disconnect = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    await supabase.functions.invoke('ctrader-disconnect', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    await loadConnection();
   };
 
   const totalReturn = Number(stats?.total_return ?? 0);
@@ -112,6 +185,48 @@ export default function BotScreen() {
           </View>
         </Animated.View>
 
+        <Animated.View entering={FadeInDown.delay(60).duration(500)}>
+          <GlassContainer style={styles.connectCard}>
+            <View style={styles.connectHeader}>
+              <View style={styles.connectTitleRow}>
+                <Ionicons name="link" size={16} color={Colors.voltrixAccent} />
+                <Text style={styles.connectTitle}>cTrader Connection</Text>
+              </View>
+              <Text style={styles.connectSub}>
+                {user ? 'Link your account to sync bot stats automatically (next step).' : 'Sign in to connect your cTrader account.'}
+              </Text>
+            </View>
+
+            {user ? (
+              <View style={styles.connectActions}>
+                {connLoading ? (
+                  <Text style={styles.connectMeta}>Checking…</Text>
+                ) : conn ? (
+                  <>
+                    <Text style={styles.connectMeta}>
+                      Connected • Scope: {conn.scope} {conn.expires_at ? `• Expires: ${new Date(conn.expires_at).toLocaleDateString()}` : ''}
+                    </Text>
+                    <Pressable style={[styles.connectBtn, styles.disconnectBtn]} onPress={disconnect}>
+                      <Ionicons name="close-circle" size={16} color="#000" />
+                      <Text style={styles.connectBtnText}>DISCONNECT</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.connectMeta}>Not connected</Text>
+                    <Pressable style={styles.connectBtn} onPress={startConnect}>
+                      <Ionicons name="log-in" size={16} color="#000" />
+                      <Text style={styles.connectBtnText}>CONNECT CTRADER</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            ) : (
+              <Text style={styles.connectMeta}>You can still view public performance without signing in.</Text>
+            )}
+          </GlassContainer>
+        </Animated.View>
+
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.heroCard}>
           <GlassContainer style={styles.heroInner}>
             <Text style={styles.heroLabel}>Equity Curve</Text>
@@ -137,12 +252,11 @@ export default function BotScreen() {
               <Text style={styles.ctaTitle}>Copy the Bot (coming next)</Text>
             </View>
             <Text style={styles.ctaText}>
-              Next step is connecting a trading account (cTrader/MT) so customers can copy positions automatically.
-              For now, you can follow signals and track the bot’s verified performance here.
+              Next step is syncing bot equity/trades from cTrader automatically, then offering copy-trading to customers.
             </Text>
             <Pressable style={styles.ctaBtn} onPress={onRefresh}>
               <Ionicons name="refresh" size={16} color="#000" />
-              <Text style={styles.ctaBtnText}>REFRESH STATS</Text>
+              <Text style={styles.ctaBtnText}>REFRESH</Text>
             </Pressable>
           </GlassContainer>
         </Animated.View>
@@ -183,6 +297,26 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 6, height: 6, borderRadius: 3 },
   liveText: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, fontFamily: Fonts.mono },
+
+  connectCard: { padding: 14, gap: 12 },
+  connectHeader: { gap: 6 },
+  connectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  connectTitle: { color: Colors.textPrimary, fontSize: 14, fontWeight: '900' },
+  connectSub: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  connectActions: { gap: 10 },
+  connectMeta: { color: Colors.textTertiary, fontSize: 12 },
+  connectBtn: {
+    height: 46,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.voltrixAccent,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  disconnectBtn: { backgroundColor: Colors.orange },
+  connectBtnText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1.3, fontFamily: Fonts.mono },
+
   heroCard: {},
   heroInner: { padding: 14 },
   heroLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 10 },

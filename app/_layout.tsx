@@ -88,6 +88,7 @@ function AppWithBiometric() {
         />
         <Stack.Screen name="auth/callback" />
         <Stack.Screen name="auth/reset" />
+        <Stack.Screen name="auth/ctrader" />
         <Stack.Screen
           name="admin"
           options={{
