@@ -10,10 +10,6 @@ export default function IndexScreen() {
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const { user } = useAuth();
 
-  // Hard-coded security override: only this exact account has admin access
-  const isAdmin =
-    user?.email === 'ukbayar@gmail.com' && user?.id === '40e32eee-1bee-4033-9ce1-f3b29d112d6e';
-
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
@@ -45,11 +41,7 @@ export default function IndexScreen() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // If admin logs in, send them to the hidden admin route
-  if (isAdmin) {
-    return <Redirect href="/admin" />;
-  }
-
+  // Admins can access the Admin tab from inside the app; don't force-redirect.
   return <Redirect href="/(tabs)" />;
 }
 
