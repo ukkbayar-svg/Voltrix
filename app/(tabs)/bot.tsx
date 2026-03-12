@@ -172,7 +172,7 @@ export default function BotScreen() {
               <Text style={styles.brandTag}>VOLTRIX</Text>
             </View>
             <Text style={styles.title}>Bot</Text>
-            <Text style={styles.subtitle}>Public performance & verified results</Text>
+            <Text style={styles.subtitle}>Verified performance</Text>
           </View>
 
           <View style={styles.headerRight}>
@@ -193,7 +193,7 @@ export default function BotScreen() {
                 <Text style={styles.connectTitle}>cTrader Connection</Text>
               </View>
               <Text style={styles.connectSub}>
-                {user ? 'Link your account to sync bot stats automatically (next step).' : 'Sign in to connect your cTrader account.'}
+                When you're ready, we'll connect your cTrader bot to auto-sync equity/trades. For now you can publish verified performance manually.
               </Text>
             </View>
 
@@ -222,7 +222,7 @@ export default function BotScreen() {
                 )}
               </View>
             ) : (
-              <Text style={styles.connectMeta}>You can still view public performance without signing in.</Text>
+              <Text style={styles.connectMeta}>Sign in to connect your cTrader account.</Text>
             )}
           </GlassContainer>
         </Animated.View>
@@ -249,10 +249,10 @@ export default function BotScreen() {
           <GlassContainer style={styles.ctaInner}>
             <View style={styles.ctaTitleRow}>
               <Ionicons name="sparkles" size={16} color={Colors.voltrixAccent} />
-              <Text style={styles.ctaTitle}>Copy the Bot (coming next)</Text>
+              <Text style={styles.ctaTitle}>cTrader Open API</Text>
             </View>
             <Text style={styles.ctaText}>
-              Next step is syncing bot equity/trades from cTrader automatically, then offering copy-trading to customers.
+              When you're ready, we'll connect your cTrader bot to auto-sync equity/trades. For now you can publish verified performance manually.
             </Text>
             <Pressable style={styles.ctaBtn} onPress={onRefresh}>
               <Ionicons name="refresh" size={16} color="#000" />
