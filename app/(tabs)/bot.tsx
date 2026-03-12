@@ -114,7 +114,7 @@ export default function BotScreen() {
 
   const redirectUri = useMemo(() => {
     // IMPORTANT: This must EXACTLY match one of the redirect URIs configured in your cTrader Open API application.
-    if (Platform.OS === 'web') return `${window.location.origin}/auth/ctrader`;
+    if (Platform.OS === 'web') return 'https://voltrix-g0jzb0ci4-ukkbayar-2168s-projects.vercel.app/auth/ctrader';
     return Linking.createURL('auth/ctrader', { scheme: 'fastshot' });
   }, []);
 

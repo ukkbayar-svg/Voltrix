@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { Colors, BorderRadius, Spacing } from '@/constants/theme';
 
 function getRedirectUri() {
-  if (Platform.OS === 'web') return `${window.location.origin}/auth/ctrader`;
+  if (Platform.OS === 'web') return 'https://voltrix-g0jzb0ci4-ukkbayar-2168s-projects.vercel.app/auth/ctrader';
   return Linking.createURL('auth/ctrader', { scheme: 'fastshot' });
 }
 
