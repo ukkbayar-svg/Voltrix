@@ -113,6 +113,7 @@ export default function BotScreen() {
   };
 
   const redirectUri = useMemo(() => {
+    // IMPORTANT: This must EXACTLY match one of the redirect URIs configured in your cTrader Open API application.
     if (Platform.OS === 'web') return `${window.location.origin}/auth/ctrader`;
     return Linking.createURL('auth/ctrader', { scheme: 'fastshot' });
   }, []);
@@ -195,6 +196,12 @@ export default function BotScreen() {
               <Text style={styles.connectSub}>
                 When you're ready, we'll connect your cTrader bot to auto-sync equity/trades. For now you can publish verified performance manually.
               </Text>
+              <View style={styles.redirectBox}>
+                <Text style={styles.redirectLabel}>Redirect URI (must be added in cTrader app)</Text>
+                <Text selectable style={[styles.redirectValue, { fontFamily: Fonts.mono }]}>
+                  {redirectUri}
+                </Text>
+              </View>
             </View>
 
             {user ? (
@@ -299,10 +306,21 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, fontFamily: Fonts.mono },
 
   connectCard: { padding: 14, gap: 12 },
-  connectHeader: { gap: 6 },
+  connectHeader: { gap: 10 },
   connectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   connectTitle: { color: Colors.textPrimary, fontSize: 14, fontWeight: '900' },
   connectSub: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  redirectBox: {
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: BorderRadius.lg,
+    padding: 10,
+    gap: 6,
+  },
+  redirectLabel: { color: Colors.textTertiary, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
+  redirectValue: { color: Colors.textPrimary, fontSize: 11 },
+
   connectActions: { gap: 10 },
   connectMeta: { color: Colors.textTertiary, fontSize: 12 },
   connectBtn: {
