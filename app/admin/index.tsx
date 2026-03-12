@@ -418,17 +418,19 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.headerActions}>
-            <Pressable
-              style={styles.headerActionBtn}
-              onPress={() => router.push('/admin/bot')}
-            >
+            <Pressable style={styles.headerActionBtn} onPress={() => router.replace('/(tabs)')}>
+              <Ionicons name="home" size={16} color={Colors.textSecondary} />
+              <Text style={styles.headerActionText}>App</Text>
+            </Pressable>
+
+            <Pressable style={styles.headerActionBtn} onPress={() => router.push('/admin/bot')}>
               <Ionicons name="hardware-chip" size={16} color={Colors.voltrixAccent} />
               <Text style={styles.headerActionText}>Bot</Text>
             </Pressable>
 
-            <Pressable style={styles.headerActionBtn} onPress={() => signOut()}>
+            <Pressable style={styles.headerActionBtn} onPress={handleSignOut}>
               <Ionicons name="log-out" size={16} color={Colors.textSecondary} />
-              <Text style={styles.headerActionText}>Exit</Text>
+              <Text style={styles.headerActionText}>Sign out</Text>
             </Pressable>
           </View>
         </Animated.View>
